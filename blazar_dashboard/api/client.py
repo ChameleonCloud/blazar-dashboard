@@ -14,7 +14,6 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 import logging
-from six.moves.urllib.parse import urlparse
 
 from django.db import connections
 from django.utils.translation import ugettext_lazy as _
@@ -168,20 +167,6 @@ def dictfetchall(cursor):
         for row in cursor.fetchall()
     ]
 
-
-def get_cursor_for_request(request):
-    """
-    Get a cursor for the database in the request's region
-
-    The DATABASES setting must be configured with all the regions to be used
-    named like "blazar-dev.tacc.chameleoncloud.org:5000" and so on.
-    """
-    endpoint = request.session.get('region_endpoint')
-    host_port = urlparse(endpoint).netloc
-    connection = connections['blazar-' + host_port]
-    return connection.cursor()
-
-
 def compute_host_available(request, start_date, end_date):
     """
     Return the number of compute hosts available for reservation for the entire
@@ -189,7 +174,7 @@ def compute_host_available(request, start_date, end_date):
     """
     start_date_str = start_date.strftime('%Y-%m-%d %H:%M')
     end_date_str = end_date.strftime('%Y-%m-%d %H:%M')
-    cursor = get_cursor_for_request(request)
+    cursor = connections['blazar'].cursor()
     cursor.execute("""
         select count(*) as available
         from computehosts ch
@@ -210,7 +195,6 @@ def compute_host_available(request, start_date, end_date):
     count = cursor.fetchone()[0]
     return count
 
-
 def node_in_lease(request, lease_id, active_only=True):
     sql = '''\
     SELECT
@@ -228,11 +212,10 @@ def node_in_lease(request, lease_id, active_only=True):
         sql += " AND ca.deleted = '{}'".format(NOT_DELETED)
     sql_args = (lease_id,)
 
-    cursor = get_cursor_for_request(request)
+    cursor = connections['blazar'].cursor()
     cursor.execute(sql, sql_args)
     hypervisor_hostnames = dictfetchall(cursor)
     return hypervisor_hostnames
-
 
 def compute_host_list(request, node_types=False):
     """Return a list of compute hosts available for reservation"""
@@ -249,21 +232,20 @@ def compute_host_list(request, node_types=False):
     WHERE
         deleted = ""
     '''
-    cursor = get_cursor_for_request(request)
+    cursor = connections['blazar'].cursor()
     cursor.execute(sql)
     compute_hosts = dictfetchall(cursor)
 
     if node_types:
-        node_types = node_type_map(cursor=cursor)
+        node_types = node_type_map(cursor)
         for ch in compute_hosts:
             ch['node_type'] = node_types.get(ch['hypervisor_hostname'], 'unknown')
 
     return compute_hosts
 
-
-def node_type_map(request=None, cursor=None):
+def node_type_map(cursor=None):
     if cursor is None:
-        cursor = get_cursor_for_request(request)
+        cursor = connections['blazar'].cursor()
     sql = '''\
     SELECT ch.hypervisor_hostname AS id, nt.node_type
     FROM blazar.computehosts AS ch
@@ -284,10 +266,9 @@ def node_type_map(request=None, cursor=None):
     node_types = dict(cursor.fetchall())
     return node_types
 
-
 def reservation_calendar(request):
     """Return a list of all scheduled leases."""
-    cursor = get_cursor_for_request(request)
+    cursor = connections['blazar'].cursor()
     sql = '''\
     SELECT
         l.name,
@@ -315,12 +296,35 @@ def reservation_calendar(request):
 
     return host_reservations
 
+def available_nodetypes():
+    cursor = connections['blazar'].cursor()
+    sql = '''\
+    SELECT DISTINCT
+        capability_value
+    FROM
+        computehost_extra_capabilities
+    WHERE
+        capability_name = 'node_type'
+        AND deleted = ''
+    '''
+    cursor.execute(sql)
+    available = {row[0] for row in cursor.fetchall()}
+    choices = [(k, six.text_type(v)) for k, v in PRETTY_TYPE_NAMES.items() if k in available]
 
-def extra_capability_names(request):
+    unprettyable = available - set(PRETTY_TYPE_NAMES)
+    if unprettyable:
+        unprettyable = sorted(unprettyable)
+        choices.extend((k, k) for k in unprettyable)
+        LOG.debug('New node types without pretty name(s): {}'.format(unprettyable))
+
+    return choices
+
+
+def extra_capability_names():
     """
     Return all the names for possible selections.
     """
-    cursor = get_cursor_for_request(request)
+    cursor = connections['blazar'].cursor()
     sql = '''\
     SELECT DISTINCT
         capability_name
@@ -335,7 +339,7 @@ def extra_capability_names(request):
     return available
 
 
-def extra_capability_values(request, name):
+def extra_capability_values(name):
     """
     Return the capabilities with a given "name". The client can cache/combine
     the rows together to build up a full copy of the extra capabilities table
@@ -346,7 +350,7 @@ def extra_capability_values(request, name):
     number of hosts are free. Might need to do the lookup between
     computehost_id (small integers) and the UUID via the uid name:value pairs.
     """
-    cursor = get_cursor_for_request(request)
+    cursor = connections['blazar'].cursor()
     sql = '''\
     SELECT
         id, computehost_id, capability_name, capability_value
