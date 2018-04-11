@@ -68,7 +68,6 @@ function capabilitiesjs() {
                 '<option value="ne">&ne;</option>' +
             '</select> '+
             '<select id="resource-node-type" class="form-control cri-val">' +
-                '<option disabled selected></option>' +
             '</select> ' +
             '<button class="btn btn-xs btn-danger cri-rm">X</button>' ;//+
             // '</div>';
@@ -154,7 +153,6 @@ function capabilitiesjs() {
         console.log("getting node options in widget capabilitiesjs")
         try {
           nodeOptions.find('[value="compute_haswell"]').attr("selected","selected");
-          console.log("node options in widget capabilitiesjs found: " + nodeOptions);
         } catch(err) {
           console.error(err);
         }
