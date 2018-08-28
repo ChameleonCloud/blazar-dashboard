@@ -47,14 +47,8 @@ PRETTY_TYPE_NAMES = OrderedDict([
 
 class Lease(base.APIDictWrapper):
     """Represents one Blazar lease."""
-    ACTIONS = (CREATE, DELETE, UPDATE, START, STOP
-               ) = ('CREATE', 'DELETE', 'UPDATE', 'START', 'STOP')
-
-    STATUSES = (IN_PROGRESS, FAILED, COMPLETE
-                ) = ('IN_PROGRESS', 'FAILED', 'COMPLETE')
-
     _attrs = ['id', 'name', 'start_date', 'end_date', 'user_id', 'project_id',
-              'before_end_date', 'action', 'status', 'status_reason']
+              'before_end_date', 'status']
 
     def __init__(self, apiresource):
         super(Lease, self).__init__(apiresource)
