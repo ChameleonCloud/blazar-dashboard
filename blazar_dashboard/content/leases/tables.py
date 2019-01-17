@@ -55,8 +55,16 @@ class UpdateLease(tables.LinkAction):
 class ViewLeaseCalendar(tables.LinkAction):
     ## TODO(nicktimko) move calendar to a panel
     name = "calendar"
-    verbose_name = _("Lease Calendar")
+    verbose_name = _("Host Calendar")
     url = "horizon:project:leases:calendar"
+    classes = ("btn-default", )
+    icon = "calendar"
+
+
+class ViewNetworkReservationCalendar(tables.LinkAction):
+    name = "network_calendar"
+    verbose_name = _("Network Calendar")
+    url = "horizon:project:leases:network_calendar"
     classes = ("btn-default", )
     icon = "calendar"
 
@@ -103,5 +111,6 @@ class LeasesTable(tables.DataTable):
     class Meta(object):
         name = "leases"
         verbose_name = _("Leases")
-        table_actions = (ViewLeaseCalendar, CreateLease, DeleteLease, )
+        table_actions = (ViewLeaseCalendar, ViewNetworkReservationCalendar,
+                         CreateLease, DeleteLease, )
         row_actions = (UpdateLease, DeleteLease, )
