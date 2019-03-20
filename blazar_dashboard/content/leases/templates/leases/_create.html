@@ -10,7 +10,7 @@
 <style>
 .datepicker{z-index:1051!important;}
 </style>
-<div class="left">
+<div class="row-fluid">
     <fieldset>
         <input id="cookie_offset" type="hidden" value="{{offset}}" />
     <div class="alert alert-warning" id="timezone">
@@ -22,28 +22,15 @@
         <a href="{% url 'horizon:settings:user:index' %}">User Settings</a>.
       </p>
     </div>
-    {% include "horizon/common/_form_fields.html" %}
+    
     </fieldset>
 </div>
-<div class="right">
-    <h3>{% trans "Description" %}:</h3>
-    <p>{% trans "Create a new lease with the provided values." %}</p>
-      <p>
-        Leave date and time values blank to start a lease immediately (on-demand).
-      </p>
-      <p>
-        For specific node reservations, you can find the node UUID using
-        <a href="https://www.chameleoncloud.org/user/discovery">Resource Discovery</a>
-        on the user portal.
-      </p>
-      <p>
-        Please be courteous to other users of the testbed and make sure your lease represents a responsible 
-        use of Chameleon resources and complies with our 
-        <a href="https://chameleoncloud.readthedocs.io/en/latest/getting-started/faq.html#what-are-the-best-practices-for-chameleon-usage" target="blank">
-            best practices</a>. 
-        Chameleon operators reserve the right to terminate leases judged to be abusive.
-      </p>
+<div class="row-fluid">
+        <fieldset>
+        {% include "horizon/common/_custom_lease_form_fields.html" %}
+        </fieldset>
 </div>
+
 {% endblock %}
 
 {% block modal-footer %}

@@ -59,7 +59,7 @@ class CreateForm(forms.SelfHandlingForm):
         required=False,
     )
     number_of_days = forms.IntegerField(
-        label=_("Reservation Length in Days"),
+        label=_("Lease Length (days)"),
         required=False,
         help_text=_('Enter whole numbers only, use zero to schedule leases that start and end on the same day'),
         initial=1,
@@ -67,10 +67,10 @@ class CreateForm(forms.SelfHandlingForm):
             'invalid': _('Value should be a whole number'),
         },
         widget=forms.DateTimeInput(
-            attrs={'placeholder':'Number of Days'}),
+            attrs={'placeholder':'0 for < 24 hours'}),
     )
     end_date = forms.DateTimeField(
-        label=_("End Date"),
+        label=_("Ends"),
         required=False,
         help_text=_('Date is calculated from the start date and duration.'),
         error_messages={
@@ -90,16 +90,25 @@ class CreateForm(forms.SelfHandlingForm):
         widget=forms.DateTimeInput(attrs={'placeholder':'Same time as now'}),
         required=False,
     )
-    resource_type = forms.ChoiceField(
-        label=_("Resource Type"),
+    # resource_type = forms.ChoiceField(
+    #     label=_("Resource Type"),
+    #     required=True,
+    #     choices=(
+    #         ('host', _('Physical Host')),
+    #         ('network', _('Network'))
+    #     ),
+    #     widget=forms.ThemableSelectWidget(attrs={
+    #         'class': 'switchable',
+    #         'data-slug': 'source'}))
+    resource_type_host = forms.BooleanField(
+        label=_("Reserve Physical Host"),
+        required = True,
+        )
+
+    resource_type_network = forms.BooleanField(
+        label=_("Reserve Network"),
         required=True,
-        choices=(
-            ('host', _('Physical Host')),
-            ('network', _('Network'))
-        ),
-        widget=forms.ThemableSelectWidget(attrs={
-            'class': 'switchable',
-            'data-slug': 'source'}))
+            )
 
     # Fields for host reservation
     min_hosts = forms.IntegerField(
@@ -145,6 +154,16 @@ class CreateForm(forms.SelfHandlingForm):
             'data-source-network': _('Network Description')})
     )
 
+    # Fields for host reservation
+    network_ip_count = forms.IntegerField(
+        label=_('Number of IP Addresses'),
+        required=False,
+        help_text=_('Enter the number of ip addresses you would like to reserve.'),
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput()
+    )
+
     resource_properties = forms.CharField(
         label=_("Resource Properties"),
         required=False,
@@ -157,37 +176,37 @@ class CreateForm(forms.SelfHandlingForm):
     )
 
     def handle(self, request, data):
-        if data['resource_type'] == 'host':
-            reservations = [
+        reservations = []
+        if data['resource_type_host'] == True:
+            reservations.append(
                 {
                     'resource_type': 'physical:host',
                     'min': data['min_hosts'],
                     'max': data['max_hosts'],
                     'hypervisor_properties': '',
                     'resource_properties': '',
-                }
-            ]
-        elif data['resource_type'] == 'instance':
-            reservations = [
-                {
-                    'resource_type': 'virtual:instance',
-                    'amount': data['amount'],
-                    'vcpus': data['vcpus'],
-                    'memory_mb': data['memory_mb'],
-                    'disk_gb': data['disk_gb'],
-                    'affinity': False
-                }
-            ]
-        elif data['resource_type'] == 'network':
-            reservations = [
+                })
+        # elif data['resource_type'] == 'instance':
+        #     reservations = [
+        #         {
+        #             'resource_type': 'virtual:instance',
+        #             'amount': data['amount'],
+        #             'vcpus': data['vcpus'],
+        #             'memory_mb': data['memory_mb'],
+        #             'disk_gb': data['disk_gb'],
+        #             'affinity': False
+        #         }
+        #     ]
+        if data['resource_type_network'] == True:
+            reservations.append(
                 {
                     'resource_type': 'network',
                     'network_name': data['network_name'],
                     'network_description': data['network_description'],
+                    'network_ip_count': data['network_ip_count'],
                     'network_properties': '',
                     'resource_properties': '',
-                }
-            ]
+                })
 
         resource_properties = data['resource_properties']
         if resource_properties:
@@ -265,7 +284,7 @@ class CreateForm(forms.SelfHandlingForm):
         num_hosts = api.client.compute_host_available(self.request,
                                                       cleaned_data['start_date'],
                                                       cleaned_data['end_date'])
-        if (cleaned_data['resource_type'] == 'host' and
+        if (cleaned_data['resource_type_host'] and
             cleaned_data['min_hosts'] > num_hosts):
             raise forms.ValidationError(_(
                 "Not enough hosts are available for this reservation (minimum "
@@ -327,7 +346,7 @@ class UpdateForm(forms.SelfHandlingForm):
     def __init__(self, request, *args, **kwargs):
         super(UpdateForm, self).__init__(request, *args, **kwargs)
         for reservation in kwargs['initial']['lease'].reservations:
-            if reservation['resource_type'] != 'physical:host':
+            if not reservation['resource_type_host']:
                 # Hide the min_hosts/max_hosts when resource_type is not
                 # physical:host
                 del self.fields['min_hosts']
