@@ -102,12 +102,12 @@ class CreateForm(forms.SelfHandlingForm):
     #         'data-slug': 'source'}))
     resource_type_host = forms.BooleanField(
         label=_("Reserve Physical Host"),
-        required = True,
+        required = False,
         )
 
     resource_type_network = forms.BooleanField(
         label=_("Reserve Network"),
-        required=True,
+        required=False,
             )
 
     # Fields for host reservation
@@ -203,9 +203,9 @@ class CreateForm(forms.SelfHandlingForm):
                     'resource_type': 'network',
                     'network_name': data['network_name'],
                     'network_description': data['network_description'],
-                    'network_ip_count': data['network_ip_count'],
-                    'network_properties': '',
-                    'resource_properties': '',
+                    # 'network_ip_count': data['network_ip_count'],
+                    # 'network_properties': '',
+                    # 'resource_properties': '',
                 })
 
         resource_properties = data['resource_properties']
