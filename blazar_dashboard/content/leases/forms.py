@@ -101,12 +101,14 @@ class CreateForm(forms.SelfHandlingForm):
         label=_("Reserve Physical Host"),
         initial = True,
         required = False,
+        widget=forms.CheckboxInput(attrs={
+            'data-slug': 'source'})
         )
 
     resource_type_network = forms.BooleanField(
         label=_("Reserve Network"),
         required=False,
-            )
+    )
 
     # Fields for host reservation
     min_hosts = forms.IntegerField(
@@ -231,13 +233,13 @@ class CreateForm(forms.SelfHandlingForm):
 
     def clean(self):
 
-        if not data['resource_type_host'] or data['resource_type_network']:
-             raise forms.ValidationError("Please select a resource type.")
-
         cleaned_data = super(CreateForm, self).clean()
         localtz = pytz.timezone(self.request.session.get(
             'django_timezone',
             self.request.COOKIES.get('django_timezone', 'UTC')))
+
+        if not cleaned_data['resource_type_host'] or cleaned_data['resource_type_network']:
+             raise forms.ValidationError("Please select a resource type.")
 
         ##### straight copy
         # convert dates and times to datetime UTC
