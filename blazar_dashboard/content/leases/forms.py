@@ -46,7 +46,7 @@ class CreateForm(forms.SelfHandlingForm):
         },
         input_formats=['%Y-%m-%d'],
         widget=forms.DateTimeInput(
-            attrs={'placeholder':'Today', 'class':'datepicker'}),
+            attrs={'placeholder':'Today', 'class':'datepicker','autocomplete':'off'}),
     )
     start_time = forms.DateTimeField(
         label=_('Start Time'),
@@ -55,19 +55,16 @@ class CreateForm(forms.SelfHandlingForm):
             'invalid': _('Value should be time, formatted HH:MM (24-hour clock)'),
         },
         input_formats=['%H:%M'],
-        widget=forms.DateTimeInput(attrs={'placeholder':'Now'}),
+        widget=forms.DateTimeInput(attrs={'placeholder':'Now','autocomplete':'off'}),
         required=False,
     )
     number_of_days = forms.IntegerField(
         label=_("Lease Length (days)"),
         required=False,
-        help_text=_('Enter whole numbers only, use zero to schedule leases that start and end on the same day'),
+        help_text=_('Set to zero to schedule leases that start and end on the same day'),
+        min_value=0,
         initial=1,
-        error_messages={
-            'invalid': _('Value should be a whole number'),
-        },
-        widget=forms.DateTimeInput(
-            attrs={'placeholder':'0 for < 24 hours'}),
+        widget=forms.NumberInput()
     )
     end_date = forms.DateTimeField(
         label=_("Ends"),
@@ -102,6 +99,7 @@ class CreateForm(forms.SelfHandlingForm):
     #         'data-slug': 'source'}))
     resource_type_host = forms.BooleanField(
         label=_("Reserve Physical Host"),
+        initial = True,
         required = False,
         )
 
@@ -156,9 +154,9 @@ class CreateForm(forms.SelfHandlingForm):
 
     # Fields for host reservation
     network_ip_count = forms.IntegerField(
-        label=_('Number of IP Addresses'),
+        label=_('Number of IP Addresses Needed'),
         required=False,
-        help_text=_('Enter the number of ip addresses you would like to reserve.'),
+        help_text=_('If needed, enter the number of ip addresses you would like to reserve.'),
         min_value=0,
         initial=0,
         widget=forms.NumberInput()
@@ -232,6 +230,10 @@ class CreateForm(forms.SelfHandlingForm):
                                       'lease: %s. Please try again.' % e)
 
     def clean(self):
+
+        if not data['resource_type_host'] or data['resource_type_network']:
+             raise forms.ValidationError("Please select a resource type.")
+
         cleaned_data = super(CreateForm, self).clean()
         localtz = pytz.timezone(self.request.session.get(
             'django_timezone',
