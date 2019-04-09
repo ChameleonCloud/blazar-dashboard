@@ -34,8 +34,8 @@ class CreateForm(forms.SelfHandlingForm):
     # General fields
     name = forms.CharField(
         label=_("Lease Name"),
-        required=True,
-        max_length=80
+        max_length=80,
+        required=True
     )
     start_date = forms.DateTimeField(
         label=_("Start Date"),
@@ -186,26 +186,23 @@ class CreateForm(forms.SelfHandlingForm):
                     'hypervisor_properties': '',
                     'resource_properties': '',
                 })
-        # elif data['resource_type'] == 'instance':
-        #     reservations = [
-        #         {
-        #             'resource_type': 'virtual:instance',
-        #             'amount': data['amount'],
-        #             'vcpus': data['vcpus'],
-        #             'memory_mb': data['memory_mb'],
-        #             'disk_gb': data['disk_gb'],
-        #             'affinity': False
-        #         }
-        #     ]
+        if data['network_ip_count'] > 0:
+            reservations.append(
+                {
+                    'resource_type': 'virtual:floatingip',
+                    'network_id': 'd54938e8-24fe-486a-b267-eab048974a7c',
+                    'amount': data['network_ip_count'],
+                }
+            )
         if data['resource_type_network'] == True:
             reservations.append(
                 {
                     'resource_type': 'network',
                     'network_name': data['network_name'],
                     'network_description': data['network_description'],
-                    # 'network_ip_count': data['network_ip_count'],
-                    # 'network_properties': '',
-                    # 'resource_properties': '',
+                    #'network_ip_count': data['network_ip_count'],
+                    'network_properties': '',
+                    'resource_properties': '',
                 })
 
         resource_properties = data['resource_properties']
@@ -237,9 +234,11 @@ class CreateForm(forms.SelfHandlingForm):
         localtz = pytz.timezone(self.request.session.get(
             'django_timezone',
             self.request.COOKIES.get('django_timezone', 'UTC')))
-
-        if not cleaned_data['resource_type_host'] or cleaned_data['resource_type_network']:
+        if not (cleaned_data['resource_type_host'] or cleaned_data['resource_type_network']):
              raise forms.ValidationError("Please select a resource type.")
+
+        if cleaned_data['resource_type_network'] and not (cleaned_data['network_name'] and cleaned_data['network_description']):
+            raise forms.ValidationError("Please enter all network details.")
 
         ##### straight copy
         # convert dates and times to datetime UTC
