@@ -348,13 +348,13 @@ class UpdateForm(forms.SelfHandlingForm):
 
     def __init__(self, request, *args, **kwargs):
         super(UpdateForm, self).__init__(request, *args, **kwargs)
+        resource_types = []
         for reservation in kwargs['initial']['lease'].reservations:
-            if not reservation['resource_type_host']:
-                # Hide the min_hosts/max_hosts when resource_type is not
-                # physical:host
+            resource_types.append(reservation['resource_type'])
+        if not 'physical:host' in resource_types:
                 del self.fields['min_hosts']
                 del self.fields['max_hosts']
-                return
+        return
 
     def handle(self, request, data):
         lease_id = data.get('lease_id')
