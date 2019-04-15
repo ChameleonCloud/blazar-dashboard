@@ -40,6 +40,8 @@
     (function(window, horizon, $, undefined) {
         'use strict';
 
+        $('#id_name').attr('required','');
+
         $('#id_start_date').datepicker({
             format: 'yyyy-mm-dd',
             todayHighlight: true,
@@ -93,11 +95,11 @@
 
         function setNetworkInput(){
             if ($('#id_resource_type_network').prop('checked')) {
-                $('#id_network_name').attr('disabled', false)
-                $('#id_network_description').attr('disabled', false)
+                $('#id_network_name').attr('disabled', false).attr('required','');
+                $('#id_network_description').attr('disabled', false).attr('required','');
             } else {
-                $('#id_network_name').attr('disabled', true)
-                $('#id_network_description').attr('disabled', true)
+                $('#id_network_name').attr('disabled', true).removeAttr('required');
+                $('#id_network_description').attr('disabled', true).removeAttr('required');
             }
         }
 
