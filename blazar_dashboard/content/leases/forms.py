@@ -87,16 +87,7 @@ class CreateForm(forms.SelfHandlingForm):
         widget=forms.DateTimeInput(attrs={'placeholder':'Same time as now'}),
         required=False,
     )
-    # resource_type = forms.ChoiceField(
-    #     label=_("Resource Type"),
-    #     required=True,
-    #     choices=(
-    #         ('host', _('Physical Host')),
-    #         ('network', _('Network'))
-    #     ),
-    #     widget=forms.ThemableSelectWidget(attrs={
-    #         'class': 'switchable',
-    #         'data-slug': 'source'}))
+
     resource_type_host = forms.BooleanField(
         label=_("Reserve Physical Host"),
         initial = True,
@@ -251,8 +242,7 @@ class CreateForm(forms.SelfHandlingForm):
         if start_time == '' or start_time == None:
             start_time = datetime.datetime.now(localtz) + datetime.timedelta(minutes=1)
 
-        #logger.debug("start date " + start_date.strftime('%Y-%m-%d'))
-        #logger.debug("start time " + start_time.strftime('%H:%M'))
+
         start_datetime = self.prepare_datetimes(start_date, start_time)
 
         end_date = cleaned_data.get("end_date")
@@ -264,8 +254,7 @@ class CreateForm(forms.SelfHandlingForm):
         if end_time == '' or end_time == None:
             end_time = datetime.datetime.now(localtz) + datetime.timedelta(days=1)
 
-        #logger.debug("End date " + end_date.strftime('%Y-%m-%d'))
-        #logger.debug("End time " + end_time.strftime('%H:%M'))
+
         end_datetime = self.prepare_datetimes(end_date, end_time)
         ##### plugging results
         cleaned_data['start_date'] = start_datetime
@@ -404,18 +393,6 @@ class UpdateForm(forms.SelfHandlingForm):
             fields['reservations'][0]['min'] = min_hosts
             fields['reservations'][0]['max'] = min_hosts
 
-        # start_time = data.get('start_time', None)
-        # end_time = data.get('end_time', None)
-        # if start_time:
-        #     if start_time[0] == '+':
-        #         fields['defer_by'] = start_time[1:]
-        #     elif start_time[0] == '-':
-        #         fields['advance_by'] = start_time[1:]
-        # if end_time:
-        #     if end_time[0] == '+':
-        #         fields['prolong_for'] = end_time[1:]
-        #     elif end_time[0] == '-':
-        #         fields['reduce_by'] = end_time[1:]
 
         try:
             api.client.lease_update(self.request, lease_id=lease_id, **fields)
@@ -429,24 +406,6 @@ class UpdateForm(forms.SelfHandlingForm):
 
     def clean(self):
         cleaned_data = super(UpdateForm, self).clean()
-
-#        lease_name = cleaned_data.get("lease_name", None)
-#        start_time = cleaned_data.get("start_time", None)
-#        end_time = cleaned_data.get("end_time", None)
-#
-#        if start_time:
-#            valid = re.match('^[+-]\d+[dhm]$', start_time)
-#            if not valid:
-#                raise forms.ValidationError("The start/end time must be "
-#                                            "a form of +/- number d/h/m. "
-#                                            "(e.g. +1h)")
-#
-#        if end_time:
-#            valid = re.match('^[+-]\d+[dhm]$', end_time)
-#            if not valid:
-#                raise forms.ValidationError("The start/end time must be "
-#                                            "a form of +/- number d/h/m. "
-#                                            "(e.g. +1h)")
 
         lease_name = cleaned_data.get("lease_name")
         prolong_for = cleaned_data.get("prolong_for")
