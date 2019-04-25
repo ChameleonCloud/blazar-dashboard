@@ -27,7 +27,7 @@
 </div>
 <div class="row-fluid">
         <fieldset>
-        {% include "horizon/common/_custom_lease_form_fields.html" %}
+        {% include "project/leases/_custom_lease_form.html" %}
         </fieldset>
 </div>
 
@@ -96,10 +96,10 @@
         function setNetworkInput(){
             if ($('#id_resource_type_network').prop('checked')) {
                 $('#id_network_name').attr('disabled', false).attr('required','');
-                $('#id_network_description').attr('disabled', false).attr('required','');
+                $('#id_network_description').attr('disabled', false);
             } else {
                 $('#id_network_name').attr('disabled', true).removeAttr('required');
-                $('#id_network_description').attr('disabled', true).removeAttr('required');
+                $('#id_network_description').attr('disabled', true);
             }
         }
 

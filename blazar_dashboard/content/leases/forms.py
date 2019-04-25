@@ -181,7 +181,7 @@ class CreateForm(forms.SelfHandlingForm):
             reservations.append(
                 {
                     'resource_type': 'virtual:floatingip',
-                    'network_id': 'd54938e8-24fe-486a-b267-eab048974a7c',
+                    'network_id': 'Public',
                     'amount': data['network_ip_count'],
                 }
             )
@@ -228,7 +228,7 @@ class CreateForm(forms.SelfHandlingForm):
         if not (cleaned_data['resource_type_host'] or cleaned_data['resource_type_network']):
              raise forms.ValidationError("Please select a resource type.")
 
-        if cleaned_data['resource_type_network'] and not (cleaned_data['network_name'] and cleaned_data['network_description']):
+        if cleaned_data['resource_type_network'] and not cleaned_data['network_name']:
             raise forms.ValidationError("Please enter all network details.")
 
         ##### straight copy
