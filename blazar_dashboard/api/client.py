@@ -17,6 +17,7 @@ from datetime import datetime
 from itertools import chain
 import logging
 from pytz import UTC
+import re
 from six.moves.urllib.parse import urlparse
 
 from django.db import connections
@@ -26,6 +27,7 @@ import six
 from horizon import exceptions
 from horizon.utils.memoized import memoized
 from openstack_dashboard.api import base
+from openstack_dashboard.api import neutron
 
 from blazarclient import client as blazar_client
 
@@ -394,3 +396,13 @@ def _parse_api_datestr(datestr):
     dateobj = datetime.strptime(datestr, "%Y-%m-%dT%H:%M:%S.%f")
 
     return dateobj.replace(tzinfo=UTC)
+
+
+def get_floatingip_network_id(request, network_name_regex):
+    """Return default network id for floatingip reservation"""
+    pattern = re.compile(network_name_regex)
+    networks = [
+        n['id'] for n in neutron.network_list(request)
+        if re.match(pattern, str(n['name']))]
+
+    return networks[0]
