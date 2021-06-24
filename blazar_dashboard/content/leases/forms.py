@@ -13,20 +13,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import datetime
-import json
-import logging
-import re
-
+from blazar_dashboard import api
 from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
 from horizon import exceptions
 from horizon import forms
 from horizon import messages
-import pytz
+import json
+import logging
 
-from blazar_dashboard import api
-from blazar_dashboard import conf
 from . import widgets
 
 LOG = logging.getLogger(__name__)
@@ -269,55 +264,7 @@ class CreateForm(forms.SelfHandlingForm):
 
         start_datetime = self.prepare_datetimes(start_date, start_time)
 
-        end_date = cleaned_data.get("end_date")
-        end_time = cleaned_data.get("end_time")
-
-        if end_date == '' or end_date == None:
-            end_date = datetime.datetime.now(localtz) + datetime.timedelta(days=1)
-
-        if end_time == '' or end_time == None:
-            end_time = datetime.datetime.now(localtz) + datetime.timedelta(days=1)
-
-
-        end_datetime = self.prepare_datetimes(end_date, end_time)
-        ##### plugging results
-        cleaned_data['start_date'] = start_datetime
-        cleaned_data['end_date'] = end_datetime
-        ##### end copy
-
-        if cleaned_data['start_date'] < datetime.datetime.now(tz=pytz.utc):
-            raise forms.ValidationError("Start date must be in the future")
-
-        if cleaned_data['start_date'] >= cleaned_data['end_date']:
-            raise forms.ValidationError("Start date must be before end")
-
-        # precheck for name conflicts
-        leases = api.client.lease_list(self.request)
-        if cleaned_data['name'] in {lease['name'] for lease in leases}:
-            raise forms.ValidationError("A lease with this name already exists.")
-
-        # precheck for host availability
-        num_hosts = api.client.compute_host_available(self.request,
-                                                      cleaned_data['start_date'],
-                                                      cleaned_data['end_date'])
-        if (cleaned_data['resource_type_host'] and
-            cleaned_data['min_hosts'] > num_hosts):
-            raise forms.ValidationError(_(
-                "Not enough hosts are available for this reservation (minimum "
-                "%s requested; %s available). Try adjusting the number of "
-                "hosts requested or the date range for the reservation.")
-                % (cleaned_data['min_hosts'], num_hosts))
-
-        return cleaned_data
-
-    def prepare_datetimes(self, date_val, time_val):
-        """
-        Ensure the date and time are in user's timezone, then convert to UTC.
-        """
-        localtz = pytz.timezone(self.request.session.get('django_timezone', self.request.COOKIES.get('django_timezone', 'UTC')))
-        datetime_val = date_val.replace(hour=time_val.time().hour, minute=time_val.time().minute, tzinfo=None)
-        datetime_val = localtz.localize(datetime_val)
-        return datetime_val.astimezone(pytz.utc)
+LOG = logging.getLogger(__name__)
 
 
 class UpdateForm(forms.SelfHandlingForm):
@@ -380,8 +327,8 @@ class UpdateForm(forms.SelfHandlingForm):
         for reservation in kwargs['initial']['lease'].reservations:
             resource_types.append(reservation['resource_type'])
         if not 'physical:host' in resource_types:
-                del self.fields['min_hosts']
-                del self.fields['max_hosts']
+            del self.fields['min_hosts']
+            del self.fields['max_hosts']
         return
 
     def handle(self, request, data):
@@ -431,7 +378,6 @@ class UpdateForm(forms.SelfHandlingForm):
                 return
             fields['reservations'][0]['min'] = min_hosts
             fields['reservations'][0]['max'] = min_hosts
-
 
         reservations = data.get('reservations', None)
         if reservations:
