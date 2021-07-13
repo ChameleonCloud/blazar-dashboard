@@ -3,18 +3,13 @@
 
   var selector = undefined; // what selector determines the gantt_element
   var task_attr = undefined; // what attribute from resources.json labels each chart row
-  var plural_resource_type = undefined; // This resource type plural display name
-
-  // Used for the chooser filter. Leave undefined for no filter
   var resource_type_attr = undefined; // what attribute from resources.json should be used to categorize resources
-  var resource_type_pretty = undefined; // display name for resource_type_attr
   var populateChooser = undefined; // a function that (partially) fills the resource category filter
-  var filterTaskNames = function(resources, nodeType){return []}; // a function that filters tasks based on the chooser value
+  var filterTaskNames = undefined; // a function that filters task names for use
+  console.log("new js")
   if ($('#blazar-gantt-host').length !== 0) {
     selector = '#blazar-gantt-host';
     resource_type_attr = "node_type";
-    resource_type_pretty = "Node Type";
-    plural_resource_type = "Hosts";
     task_attr = "node_name";
     populateChooser = function(chooser, availableResourceTypes){
       var nodeTypesPretty = [ // preserve order so it's not random
@@ -114,33 +109,20 @@
       resources = resp.resources;
 
       // populate node-type-chooser
-      var chooser = $("#resource-type-chooser");
-      if(populateChooser != undefined){
-        $("label[for='resource-type-chooser']").text(resource_type_pretty);
-        var availableResourceTypes = {};
-        resources.forEach(function(resource) {
-            availableResourceTypes[resource[resource_type_attr]] = true;
-        });
-        chooser.empty();
-        populateChooser(chooser, availableResourceTypes)
-        Object.keys(availableResourceTypes).forEach(function (key) {
-          if (availableResourceTypes[key]) {
-            chooser.append(new Option(key, key));
-          }
-        });
-        chooser.prop('disabled', false);
-        chooser.change(function() {
-          var timeDomain = getTimeDomain();
-          var nodeType = $('#resource-type-chooser').val();
-          var filteredTaskNames = filterTaskNames(resources, nodeType);
-          tasks = all_tasks.filter(function(task) {
-            return filteredTaskNames.includes(task.taskName)
-          });
-          construct_gantt(tasks, filteredTaskNames, timeDomain)
-        });
-      } else {
-        chooser.hide()
-      }
+      var availableResourceTypes = {};
+      resources.forEach(function(resource) {
+          availableResourceTypes[resource[resource_type_attr]] = true;
+      });
+      var chooser = $("#node-type-chooser");
+      chooser.empty(); // make idempotent so multiple loads don't fill multiple times (should also fix the multiple-load thing later...)
+      populateChooser(chooser, availableResourceTypes)
+      // fill chooser with node-types without a pretty name (when new ones pop up)
+      Object.keys(availableResourceTypes).forEach(function (key) {
+        if (availableResourceTypes[key]) {
+          chooser.append(new Option(key, key));
+        }
+      });
+      chooser.prop('disabled', false);
 
       var taskNames = $.map(resp.resources, function(resource, i) {
         return resource[task_attr];
@@ -212,6 +194,29 @@
 
     $('input[data-datepicker]', form).datepicker({
       dateFormat: 'mm/dd/yyyy'
+    });
+
+    $('#node-type-chooser').change(function() {
+      var timeDomain = getTimeDomain();
+      var nodeType = $('#node-type-chooser').val();
+
+      var filteredTaskNames = filterTaskNames(resources);
+
+      tasks = all_tasks.filter(function(task) {
+        return filteredTaskNames.indexOf(task.taskName) >= 0
+      });
+
+      gantt_element.empty().height(20 * filteredTaskNames.length);
+      gantt = d3.gantt({
+        selector: selector,
+        taskTypes: filteredTaskNames,
+        taskStatus: taskStatus,
+        tickFormat: format,
+        timeDomainStart: timeDomain[0],
+        timeDomainEnd: timeDomain[1],
+      });
+      console.log(tasks)
+      gantt(tasks);
     });
 
     $('input', form).on('change', function() {
