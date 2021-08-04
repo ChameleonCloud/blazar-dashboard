@@ -2,6 +2,8 @@
   'use strict';
 
   const restrictedBackgroundColor = "#aaa";
+  const CHART_TITLE_HEIGHT = 68;
+  const ROW_HEIGHT = 60;
 
   var selector = undefined; // what selector determines the calendarElement
   var rowAttr = undefined; // what attribute from resources.json labels each chart row
@@ -153,7 +155,7 @@
             chart.updateOptions({
               series: filteredReservations,
               grid: { row: { colors: getGridBackground(currentResources) } },
-              chart: { height: 60 * filteredReservations[0].data.length + 68}
+              chart: { height: ROW_HEIGHT * filteredReservations[0].data.length + CHART_TITLE_HEIGHT}
             })
             setTimeDomain(getTimeDomain())
           });
@@ -174,7 +176,7 @@
           type: 'rangeBar',
           toolbar: {show: false},
           zoom: {enabled: false, type: 'xy'},
-          height: 60 * resources.length + 68,
+          height: ROW_HEIGHT * resources.length + CHART_TITLE_HEIGHT,
           width: "100%",
           events: {
             updated: function(chartContext, config){
