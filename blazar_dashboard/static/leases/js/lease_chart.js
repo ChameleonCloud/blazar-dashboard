@@ -153,6 +153,7 @@
             chart.updateOptions({
               series: filteredReservations,
               grid: { row: { colors: getGridBackground(currentResources) } },
+              chart: { height: 60 * filteredReservations[0].data.length + 68}
             })
             setTimeDomain(getTimeDomain())
           });
@@ -173,7 +174,7 @@
           type: 'rangeBar',
           toolbar: {show: false},
           zoom: {enabled: false, type: 'xy'},
-          height: 60 * resources.length,
+          height: 60 * resources.length + 68,
           width: "100%",
           events: {
             updated: function(chartContext, config){
