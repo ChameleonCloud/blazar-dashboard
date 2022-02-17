@@ -18,6 +18,7 @@ import re
 
 from pytz import UTC
 
+from blazar_dashboard import conf
 from blazarclient import client as blazar_client
 from collections import OrderedDict
 from django.db import connections
@@ -349,11 +350,15 @@ def reservation_calendar(request):
     """Return a list of all scheduled leases."""
 
     def compute_host2dict(h):
-        return dict(
+        host_dict = dict(
             hypervisor_hostname=h.hypervisor_hostname, vcpus=h.vcpus,
             memory_mb=h.memory_mb, local_gb=h.local_gb, cpu_info=h.cpu_info,
             hypervisor_type=h.hypervisor_type, node_type=h.node_type,
             node_name=compute_host_display_name(h))
+        url_format = conf.host_reservation.get("url_format")
+        if url_format:
+            host_dict["url"] = url_format.format(**host_dict)
+        return host_dict
 
     hosts_by_id = {h.id: h for h in host_list(request) if h.reservable}
 

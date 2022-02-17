@@ -179,6 +179,18 @@
           height: ROW_HEIGHT * resources.length + CHART_TITLE_HEIGHT,
           width: "100%",
           events: {
+            click: function(event, chartContext, config) {
+              var el = event.target
+              // Select the parent text node if the child is selected
+              if(el.nodeName == "tspan"){
+                el = el.parentElement
+              }
+              let index = $('text.apexcharts-yaxis-label').index(el);
+              let resource = currentResources[index]
+              if(resource && resource.url){
+                window.open(resource.url, '_blank').focus()
+              }
+            },
             updated: function (chartContext, config) {
               $(`rect.apexcharts-grid-row[fill='${RESTRICTED_BACKGROUND_COLOR}']`).mouseout(function (event) {
                 $("#resource-disabled-tooltip").hide();
