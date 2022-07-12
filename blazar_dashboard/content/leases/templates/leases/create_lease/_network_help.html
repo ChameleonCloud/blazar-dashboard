@@ -5,5 +5,20 @@
 <div class="alert alert-info">
 Network name is required when reserving a network.
 </div>
+<div id="network-warning" class="alert alert-warning" style="visibility: hidden">
+You are trying to lease an entire network segment VLAN!
+Are you sure you need to do this? It is possible to create a private
+layer 2 VLAN without needing a network reservation.
+<a href="https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_vlan.html" target="_blank">
+  Learn more.
+</a>
+</div>
+<div id="ip-warning" class="alert alert-warning" style="visibility: hidden">
+Please be conservative with your reservations of floating IP addresses! There is typically
+no need to reserve more than one per-project for a given site.
+<a href="https://www.chameleoncloud.org/blog/2019/02/27/save-planet-use-fewer-ips/" target="_blank">
+  Learn more.
+</a>
+</div>
 {% endif %}
 {% endblock %}
