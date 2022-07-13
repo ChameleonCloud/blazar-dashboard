@@ -6,16 +6,16 @@
 Network name is required when reserving a network.
 </div>
 <div id="network-warning" class="alert alert-warning" style="visibility: hidden">
-You are trying to lease an entire network segment VLAN!
-Are you sure you need to do this? It is possible to create a private
-layer 2 VLAN without needing a network reservation.
+Network reservations are required for some advanced networking features, like stitching and the filesystem.
+It is possible to create a private layer 2 VLAN without a network reservation.
 <a href="https://chameleoncloud.readthedocs.io/en/latest/technical/networks/networks_vlan.html" target="_blank">
   Learn more.
 </a>
 </div>
 <div id="ip-warning" class="alert alert-warning" style="visibility: hidden">
-Please be conservative with your reservations of floating IP addresses! There is typically
-no need to reserve more than one per-project for a given site.
+Floating IP addresses are used to connect to an instance over the internet. There is typically
+no need to reserve more than one per-project for a given site. If there are no floating IPs available,
+try taking an ad-hoc IP (no reservation required).
 <a href="https://www.chameleoncloud.org/blog/2019/02/27/save-planet-use-fewer-ips/" target="_blank">
   Learn more.
 </a>
