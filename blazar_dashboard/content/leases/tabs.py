@@ -12,14 +12,19 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import logging
 
 from django.conf import settings
+from django.template.context_processors import csrf
 from django.urls import reverse
 from django.utils.translation import ugettext_lazy as _
 from horizon import exceptions
+from horizon import messages
 from horizon import tabs
 
 from blazar_dashboard.api import client
+
+LOG = logging.getLogger(__name__)
 
 RESERVATION_GENERALS = (
     'id',
@@ -54,15 +59,47 @@ class OverviewTab(tabs.Tab):
             redirect = reverse('horizon:project:leases:index')
             msg = _('Unable to retrieve nodes in lease.')
             exceptions.handle(request, msg, redirect=redirect)
+            return
 
         site = None
         sites = getattr(settings, 'CHAMELEON_SITES')
         if sites:
             site = sites.get(request.session.get('services_region'))
+        for node in nodes:
+            if "reservable" not in node:
+                node["reservable"] = "_"
         return {'lease': lease, 'nodes': nodes, 'site': site,
-                'reservation_generals': RESERVATION_GENERALS}
+                'reservation_generals': RESERVATION_GENERALS, **csrf(request)}
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handles requests made by buttons
+        """
+        host_reallocate = request.POST.get("host_reallocate")
+        if not host_reallocate:
+            LOG.error(f"Received malformed POST: {request.POST}")
+            return
+        try:
+            host_id, lease_id = host_reallocate.split(maxsplit=1)
+        except Exception:
+            exceptions.handle(request, _("Missing node ID or Lease ID"))
+            return
+
+        try:
+            client.host_reallocate(request, host_id, lease_id)
+        except Exception:
+            exceptions.handle(request, _("Could not reallocate host."))
+            return
+
+        messages.success(request, f"Reallocated host {host_id}. "
+                                  f"Updates may not appear in lease "
+                                  f"for a few more seconds.")
 
 
 class LeaseDetailTabs(tabs.TabGroup):
     slug = "lease_details"
     tabs = (OverviewTab,)
+
+    @property
+    def selected(self):
+        return self.get_tab(OverviewTab.slug)
