@@ -89,9 +89,7 @@
               {% endif %}
               <b>
                 (status:
-                {% if node.reservable == "_" %}
-                  unknown)
-                {% elif node.reservable %}
+                {% if node.reservable %}
                   healthy)
                 {% else %}
                   unhealthy)
@@ -99,7 +97,7 @@
               </b>
                 <button class="btn btn-danger btn-xs"
                         type="submit" name="host_reallocate"
-                        help_text="If your host has become unhealthy, please report it to the help desk so we can fix it."
+                        help_text="If your node is experiencing issues, please report it to the help desk so it can be fixed."
                         title="Replace this host with another which has the same resource properties."
                         value="{{ node.hypervisor_hostname }} {{ lease.id }}">
                   Re-Allocate Host

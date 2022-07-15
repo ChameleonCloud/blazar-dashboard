@@ -65,9 +65,6 @@ class OverviewTab(tabs.Tab):
         sites = getattr(settings, 'CHAMELEON_SITES')
         if sites:
             site = sites.get(request.session.get('services_region'))
-        for node in nodes:
-            if "reservable" not in node:
-                node["reservable"] = "_"
         return {'lease': lease, 'nodes': nodes, 'site': site,
                 'reservation_generals': RESERVATION_GENERALS, **csrf(request)}
 

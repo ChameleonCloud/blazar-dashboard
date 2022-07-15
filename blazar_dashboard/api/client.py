@@ -341,7 +341,9 @@ def nodes_in_lease(request, lease):
     hypervisor_by_host_id = {
         h.id: {
             'hypervisor_hostname': h.hypervisor_hostname,
-            'node_name': compute_host_display_name(h)}
+            'node_name': compute_host_display_name(h),
+            'reservable': h.reservable,
+        }
         for h in host_list(request)}
 
     return [
@@ -349,7 +351,9 @@ def nodes_in_lease(request, lease):
             hypervisor_hostname=hypervisor_by_host_id[h.resource_id].get(
                 'hypervisor_hostname'),
             node_name=hypervisor_by_host_id[h.resource_id].get('node_name'),
-            deleted=False)
+            deleted=False,
+            reservable=hypervisor_by_host_id[h.resource_id].get('reservable'),
+        )
         for h in host_allocations_list(request)
         if any((r['lease_id'] == lease['id']) for r in h.reservations)]
 
