@@ -66,3 +66,8 @@ class OverviewTab(tabs.Tab):
             site = sites.get(request.session.get('services_region'))
         return {'lease': lease, 'nodes': nodes, 'site': site,
                 'reservation_generals': RESERVATION_GENERALS, **csrf(request)}
+
+
+class LeaseDetailTabs(tabs.TabGroup):
+    slug = "lease_details"
+    tabs = (OverviewTab,)
