@@ -73,7 +73,7 @@
   <div class="info detail">
     <h4>{% trans "Nodes" %}</h4>
     <hr class="header_rule">
-    <form role="form" method="post">
+    <form role="form" method="post" action="{% url 'horizon:project:leases:reallocate' lease.id %}">
       {% csrf_token %}
       <dl class="dl-horizontal">
         {% for node in nodes %}

@@ -59,7 +59,6 @@ class OverviewTab(tabs.Tab):
             redirect = reverse('horizon:project:leases:index')
             msg = _('Unable to retrieve nodes in lease.')
             exceptions.handle(request, msg, redirect=redirect)
-            return
 
         site = None
         sites = getattr(settings, 'CHAMELEON_SITES')
@@ -67,36 +66,3 @@ class OverviewTab(tabs.Tab):
             site = sites.get(request.session.get('services_region'))
         return {'lease': lease, 'nodes': nodes, 'site': site,
                 'reservation_generals': RESERVATION_GENERALS, **csrf(request)}
-
-    def post(self, request, *args, **kwargs):
-        """
-        Handles requests made by buttons
-        """
-        host_reallocate = request.POST.get("host_reallocate")
-        if not host_reallocate:
-            LOG.error(f"Received malformed POST: {request.POST}")
-            return
-        try:
-            host_id, lease_id = host_reallocate.split(maxsplit=1)
-        except Exception:
-            exceptions.handle(request, _("Missing node ID or Lease ID"))
-            return
-
-        try:
-            client.host_reallocate(request, host_id, lease_id)
-        except Exception:
-            exceptions.handle(request, _("Could not reallocate host."))
-            return
-
-        messages.success(request, f"Reallocated host {host_id}. "
-                                  f"Updates may not appear in lease "
-                                  f"for a few more seconds.")
-
-
-class LeaseDetailTabs(tabs.TabGroup):
-    slug = "lease_details"
-    tabs = (OverviewTab,)
-
-    @property
-    def selected(self):
-        return self.get_tab(OverviewTab.slug)
