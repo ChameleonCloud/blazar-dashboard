@@ -59,6 +59,10 @@
     selector = '#blazar-calendar-network'
     pluralResourceType = gettext("Networks")
     rowAttr = "segment_id";
+    
+    chooserAttr = "network_type";
+    chooserAttrPretty = gettext("Network Type");
+    populateChooser = function (chooser, availableResourceTypes) { }
   }
   if ($('#blazar-calendar-device').length !== 0) {
     selector = '#blazar-calendar-device'
@@ -97,7 +101,7 @@
         });
         return reservationCopy;
       });
-      currentResources = resources.filter(function (resource) {
+      currentResources = fixedResources.filter(function (resource) {
         return chosenType === '*' || chosenType === resource[chooserAttr];
       });
       chart.updateOptions({
@@ -118,11 +122,24 @@
     $.getJSON("resources.json")
       .done(function (resp) {
         projectId = resp.project_id;
-        resources = resp.resources;
-        currentResources = resources
+
+	// Fix network segment_id to string
+	var fixedResources = []
+	if (selector == '#blazar-calendar-network') {
+	  resp.resources.forEach(function (resource) {
+	      var newResource = Object.assign({}, resource);
+	      newResource[rowAttr] = newResource[rowAttr].toString()
+	      fixedResources.push(newResource);
+	  });
+	} else {
+	  fixedResources = resp.resources;
+	}
+	currentResources = fixedResources;
+	resources = fixedResources;
+
         var reservationsWithResources = resp.reservations;
         reservationsWithResources.forEach(function (reservation) {
-          resp.resources.forEach(function (resource) {
+          fixedResources.forEach(function (resource) {
             if (reservation[rowAttr] == resource[rowAttr]) {
               reservation[chooserAttr] = resource[chooserAttr]
             }
@@ -150,7 +167,7 @@
         // Dummy data to force rendering of all resources
         reservationsById["0"] = { "name": "0", "data": [] }
         // For this row shows up at all, we need at least 1 data point.
-        resp.resources.forEach(function (resource) {
+        fixedResources.forEach(function (resource) {
           var dummyData = { x: resource[rowAttr], y: [0, 0] }
           dummyData[chooserAttr] = resource[chooserAttr]
           reservationsById["0"].data.push(dummyData)
@@ -164,7 +181,7 @@
         if (populateChooser != undefined) {
           $("label[for='resource-type-chooser']").text(chooserAttrPretty);
           var availableResourceTypes = {};
-          resp.resources.forEach(function (resource) {
+          fixedResources.forEach(function (resource) {
             availableResourceTypes[resource[chooserAttr]] = true;
           });
           chooser.empty();
@@ -178,6 +195,7 @@
         } else {
           chooser.hide()
         }
+
         constructCalendar(filteredReservations, computeTimeDomain(7))
       })
       .fail(function () {

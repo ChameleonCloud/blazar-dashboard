@@ -75,6 +75,7 @@ def calendar_data_view(request, resource_type):
     data['resources'] = resources
     data['reservations'] = reservations
     data["project_id"] = request.user.project_id
+
     return JsonResponse(data)
 
 
