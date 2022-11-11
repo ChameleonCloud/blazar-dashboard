@@ -72,6 +72,7 @@
     chooserAttr = "vendor";
     chooserAttrPretty = gettext("Vendor");
     populateChooser = function (chooser, availableResourceTypes) {
+      alert(JSON.stringify(availableResourceTypes));
       let networkTypesPretty = [
           ['vlan', gettext("VLAN")],
           ['storage', gettext("Storage")]
