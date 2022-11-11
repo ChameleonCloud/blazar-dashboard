@@ -103,6 +103,7 @@
       console.log('blocking duplicate init');
     }
     calendarElement.addClass('loaded');
+    let fixedResources = [];
 
     const onCalendarFilterChange = function () {
       const chosenType = $('#resource-type-chooser').val();
@@ -136,7 +137,6 @@
         projectId = resp.project_id;
 
 	// Fix network segment_id to string
-	let fixedResources = [];
 	if (selector === '#blazar-calendar-network') {
 	  resp.resources.forEach(function (resource) {
 	      let newResource = Object.assign({}, resource);
