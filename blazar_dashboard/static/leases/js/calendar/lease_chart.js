@@ -71,7 +71,18 @@
 
     chooserAttr = "vendor";
     chooserAttrPretty = gettext("Vendor");
-    populateChooser = function (chooser, availableResourceTypes) { }
+    populateChooser = function (chooser, availableResourceTypes) {
+      let networkTypesPretty = [
+          ['vlan', gettext("VLAN")],
+          ['storage', gettext("Storage")]
+      ];
+      networkTypesPretty.forEach((nt) => {
+        if (availableResourceTypes[nt[0]]) {
+          chooser.append(new Option(nt[1], nt[0], false, false));
+          delete availableResourceTypes[nt[0]];
+        }
+      });
+    };
   }
   if (selector == undefined) return;
   var calendarElement = $(selector);
