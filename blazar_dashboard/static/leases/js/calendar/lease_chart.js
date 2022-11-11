@@ -62,7 +62,7 @@
     
     chooserAttr = "network_type";
     chooserAttrPretty = gettext("Network Type");
-    populateChooser = function (chooser, availableResourceTypes) { }
+    populateChooser = function (chooser, availableResourceTypes) { };
   }
   if ($('#blazar-calendar-device').length !== 0) {
     selector = '#blazar-calendar-device'
@@ -124,11 +124,11 @@
         projectId = resp.project_id;
 
 	// Fix network segment_id to string
-	var fixedResources = []
-	if (selector == '#blazar-calendar-network') {
+	let fixedResources = [];
+	if (selector === '#blazar-calendar-network') {
 	  resp.resources.forEach(function (resource) {
-	      var newResource = Object.assign({}, resource);
-	      newResource[rowAttr] = newResource[rowAttr].toString()
+	      let newResource = Object.assign({}, resource);
+	      newResource[rowAttr] = newResource[rowAttr].toString();
 	      fixedResources.push(newResource);
 	  });
 	} else {
