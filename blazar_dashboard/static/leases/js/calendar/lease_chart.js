@@ -62,18 +62,9 @@
     
     chooserAttr = "network_type";
     chooserAttrPretty = gettext("Network Type");
-    populateChooser = function (chooser, availableResourceTypes) { };
-  }
-  if ($('#blazar-calendar-device').length !== 0) {
-    selector = '#blazar-calendar-device'
-    pluralResourceType = gettext("Devices")
-    rowAttr = "device_name";
-
-    chooserAttr = "vendor";
-    chooserAttrPretty = gettext("Vendor");
     populateChooser = function (chooser, availableResourceTypes) {
-      alert(JSON.stringify(availableResourceTypes));
-      let networkTypesPretty = [
+     alert(JSON.stringify(availableResourceTypes));
+      const networkTypesPretty = [
           ['vlan', gettext("VLAN")],
           ['storage', gettext("Storage")]
       ];
@@ -84,6 +75,15 @@
         }
       });
     };
+  }
+  if ($('#blazar-calendar-device').length !== 0) {
+    selector = '#blazar-calendar-device'
+    pluralResourceType = gettext("Devices")
+    rowAttr = "device_name";
+
+    chooserAttr = "vendor";
+    chooserAttrPretty = gettext("Vendor");
+    populateChooser = function (chooser, availableResourceTypes) { };
   }
   if (selector == undefined) return;
   var calendarElement = $(selector);
