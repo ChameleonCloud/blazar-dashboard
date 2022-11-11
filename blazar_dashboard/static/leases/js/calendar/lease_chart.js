@@ -63,10 +63,8 @@
     chooserAttr = "network_type";
     chooserAttrPretty = gettext("Network Type");
     populateChooser = function (chooser, availableResourceTypes) {
-     alert(JSON.stringify(availableResourceTypes));
       const networkTypesPretty = [
           ['vlan', gettext("VLAN")],
-          ['storage', gettext("Storage")]
       ];
       networkTypesPretty.forEach((nt) => {
         if (availableResourceTypes[nt[0]]) {
