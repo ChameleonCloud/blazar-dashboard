@@ -12,7 +12,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
+import functools
 from datetime import datetime
 
 import pytz
@@ -145,6 +145,7 @@ class LeasesTable(tables.DataTable):
         if user_id_column:
             user_id_column.filters.append(lambda u: self.uid_to_user(u))
 
+    @functools.lru_cache(maxsize=10_000)
     def uid_to_user(self, uid):
         if not uid:
             return None
