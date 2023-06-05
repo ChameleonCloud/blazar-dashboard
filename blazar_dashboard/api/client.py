@@ -252,9 +252,6 @@ def network_allocations_list(request):
 def network_capabilities_list(request):
     extra_capabilities = blazarclient(
         request).network.list_capabilities(detail=True)
-    extra_capabilities.append({'property': 'usage_type',
-                               'private': False,
-                               'capability_values': ['general', 'filesystem', 'stitchable']})
     return [ExtraCapability(e) for e in extra_capabilities]
 
 
