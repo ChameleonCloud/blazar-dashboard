@@ -54,7 +54,7 @@ class OverviewTab(tabs.Tab):
             exceptions.handle(request, msg, redirect=redirect)
 
         try:
-            nodes = client.nodes_in_lease(self.request, lease)
+            nodes = client.hosts_in_lease(self.request, lease.id)
         except Exception:
             redirect = reverse('horizon:project:leases:index')
             msg = _('Unable to retrieve nodes in lease.')
