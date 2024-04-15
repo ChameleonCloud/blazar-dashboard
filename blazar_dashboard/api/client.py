@@ -180,6 +180,12 @@ def lease_delete(request, lease_id):
     blazarclient(request).lease.delete(lease_id)
 
 
+def nodes_in_lease(request, lease_id):
+    """Hosts in a lease"""
+    hosts = blazarclient(request).lease.hosts_in_lease(lease_id)
+    return [Host(h) for h in hosts]
+
+
 def host_list(request):
     """List hosts."""
     hosts = blazarclient(request).host.list()
@@ -330,32 +336,6 @@ def device_available(request, start_date, end_date):
 
 def compute_host_display_name(host):
     return getattr(host, 'node_name', 'node{}'.format(host.id))
-
-
-def nodes_in_lease(request, lease):
-    """Return list of hypervisor_hostnames in a lease."""
-    if not any(
-            r['resource_type'] == 'physical:host' for r in lease['reservations']):
-        return []
-
-    hypervisor_by_host_id = {
-        h.id: {
-            'hypervisor_hostname': h.hypervisor_hostname,
-            'node_name': compute_host_display_name(h),
-            'reservable': h.reservable,
-        }
-        for h in host_list(request)}
-
-    return [
-        dict(
-            hypervisor_hostname=hypervisor_by_host_id[h.resource_id].get(
-                'hypervisor_hostname'),
-            node_name=hypervisor_by_host_id[h.resource_id].get('node_name'),
-            deleted=False,
-            reservable=hypervisor_by_host_id[h.resource_id].get('reservable'),
-        )
-        for h in host_allocations_list(request)
-        if any((r['lease_id'] == lease['id']) for r in h.reservations)]
 
 
 def reservation_calendar(request):
