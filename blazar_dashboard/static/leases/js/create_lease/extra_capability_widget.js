@@ -24,6 +24,9 @@ function capabilitiesjs(resource_type, switchable_classname) {
     xhr.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
             capabilityValues = JSON.parse(this.responseText)['extra_capabilities'];
+            if (capabilityValues == undefined) {
+                capabilityValues = {}
+            }
             capabilityNames = Object.keys(capabilityValues);
             capabilityNames.sort();
             var props = document.getElementById('criteria-payload-' + resource_type).getAttribute('form_data');

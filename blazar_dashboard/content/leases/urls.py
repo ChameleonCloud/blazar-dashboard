@@ -27,7 +27,9 @@ urlpatterns = [
     re_path(r'^(?P<resource_type>[^/]+)/extras\.json$',
         leases_views.extra_capabilities,
         name='extra_capabilities'),
-
+    re_path(r'flavors\.json$',
+        leases_views.flavors,
+        name='flavors'),
     re_path(r'^$', leases_views.IndexView.as_view(), name='index'),
     re_path(r'^create/$', leases_views.CreateView.as_view(), name='create'),
     re_path(LEASE_URL % '', leases_views.DetailView.as_view(),
