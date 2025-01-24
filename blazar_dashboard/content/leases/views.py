@@ -94,6 +94,10 @@ def extra_capabilities(request, resource_type):
     return JsonResponse(data)
 
 
+def flavors(request):
+    return JsonResponse({'flavors': api.client.flavors(request)})
+
+
 class DetailView(tabs.TabView):
     tab_group_class = project_tabs.LeaseDetailTabs
     template_name = 'project/leases/detail.html'

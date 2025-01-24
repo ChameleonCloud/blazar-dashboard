@@ -429,6 +429,56 @@ class SetDevices(workflows.Step):
         return conf.device_reservation.get("enabled", False)
 
 
+
+class SetFlavorsAction(workflows.Action):
+    with_flavor = forms.BooleanField(label=_("Reserve Flavors"),
+                                          initial=False,
+                                          required=False,
+                                          )
+    flavor_amount = forms.IntegerField(
+        label=_('Number of Instances for Flavor'),
+        required=False,
+        help_text=_('Enter the number of instances for the selected flavor.'),
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={
+            'class': 'create-lease-switch-on-flavor'
+        })
+    )
+    flavor_id = forms.CharField(
+        label=_("Resource Properties"),
+        required=False,
+        help_text=_('Choose flavor to reserve.'),
+        max_length=1024,
+        widget=widgets.FlavorSelectWidget(
+            switchable_class='create-lease-switch-on-flavor',
+        )
+    )
+
+    class Meta(object):
+        name = _("Flavors")
+        help_text_template = ("project/leases/create_lease/"
+                              "_flavor_help.html")
+
+    def clean(self):
+        cleaned_data = super(SetFlavorsAction, self).clean()
+
+        if not (cleaned_data.get('with_flavor') and
+                cleaned_data.get('flavor_amount') and cleaned_data.get("flavor_id")):
+            return cleaned_data
+
+        return cleaned_data
+
+
+class SetFlavors(workflows.Step):
+    action_class = SetFlavorsAction
+    template_name = 'project/leases/create_lease/_flavor_step.html'
+    contributes = ("with_flavor", "flavor_amount", "flavor_id")
+
+    def allowed(self, request):
+        return conf.flavor_reservation.get("enabled", False)
+
+
 class CreateLease(workflows.Workflow):
     slug = "create_lease"
     name = _("Create Lease")
@@ -438,7 +488,7 @@ class CreateLease(workflows.Workflow):
     failure_message = _('Unable to create the lease named "%s".')
     success_url = reverse_lazy('horizon:project:leases:index')
     wizard = True
-    default_steps = [SetGeneral, SetHosts,
+    default_steps = [SetGeneral, SetHosts, SetFlavors,
                      SetNetworks, SetDevices]
 
     def format_status_message(self, message):
@@ -455,6 +505,7 @@ class CreateLease(workflows.Workflow):
             # check if any resource is reserved
             if (not self.context.get('with_computehost', False) and
                 not self.context.get('with_network', False) and
+                not self.context.get('with_flavor', False) and
                 not self.context.get('with_floatingip', False) and
                     not self.context.get('with_device', False)):
                 raise forms.ValidationError(
@@ -544,6 +595,17 @@ class CreateLease(workflows.Workflow):
                     'max': data['max_devices'],
                     'resource_properties': res_props,
                 })
+        if (data.get('with_flavor', False) and
+            conf.flavor_reservation.get('enabled', False) and
+                data['flavor_amount'] > 0):
+            reservations.append(
+                {
+                    'resource_type': 'flavor:instance',
+                    'flavor_id': data["flavor_id"],
+                    'amount': data['flavor_amount'],
+                    "affinity": "None",
+                }
+            )
 
         events = []
         try:
