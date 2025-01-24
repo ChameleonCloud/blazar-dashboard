@@ -1,0 +1,36 @@
+{% load i18n %}
+{% load static %}
+
+{% block main %}
+    {% include 'horizon/common/_workflow_step.html' %}
+{% endblock %}
+
+{% block js %}
+<script type="text/javascript">
+(function (window, horizon, $, undefined) {
+    'use strict';
+
+    const toggleVisibility = function(div) {
+      if (div.style.visibility === "hidden") {
+        return "visible";
+      } else {
+        return "hidden";
+      }
+    }
+
+    try {
+    	document.addEventListener('flavors_loaded', function() {
+    		setResourceTypeInput('flavor');
+    	}, false);
+        $('#id_with_flavor').on('change', function() {
+        	setResourceTypeInput('flavor');
+          const flavorWarning = document.getElementById("flavor-warning");
+          flavorWarning.style.visibility = toggleVisibility(flavorWarning);
+        });        
+      } catch (err) {
+        console.error(err);
+      }
+    
+ })(window, horizon, jQuery);
+</script>
+{% endblock %}

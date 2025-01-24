@@ -26,6 +26,7 @@ import json
 import logging
 from openstack_dashboard.api import base
 from openstack_dashboard.api import neutron
+from openstack_dashboard.api import _nova
 
 
 LOG = logging.getLogger(__name__)
@@ -510,6 +511,12 @@ def device_extra_capabilities(request):
     return {
         x.property: x.property_values for x
         in device_capabilities_list(request)}
+
+
+def flavors(request):
+    # NOTE we need >=v2.55 (pre-Queens) for flavor description, which will be useful for users.
+    flavors = _nova.novaclient(request, version="2.55").flavors.list()
+    return [f.to_dict() for f in flavors]
 
 
 def get_floatingip_network_id(request, network_name_regex):
