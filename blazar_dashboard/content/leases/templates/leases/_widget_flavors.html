@@ -38,8 +38,6 @@
 <script>
 'use strict';
 
-// var flavors = []
-
 var cri_div = document.querySelector('#select-flavor');
 var crbody = document.querySelector('#select-flavor-table tbody');
 var cr_input = document.querySelector("#select-payload-flavor")
@@ -50,8 +48,9 @@ if (cri_div.dataset.loaded_once === undefined) {
     xhr.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
             let flavorValues = JSON.parse(this.responseText)['flavors'];
-            flavorValues.forEach(flavor => {
-                // flavors.push(flavor)
+            flavorValues.filter(
+                flavor => !flavor.name.startsWith("reservation:")
+            ).forEach(flavor => {
                 const row = document.createElement('tr');
 
                 const nameCell = document.createElement('td');
@@ -90,7 +89,7 @@ if (cri_div.dataset.loaded_once === undefined) {
                     cr_input.value = flavor.id
                     console.log(cr_input.value)
                 });
-                selectButton.classList.add("btn")
+                selectButton.classList.add("btn", "create-lease-switch-on-flavor")
                 actionCell.appendChild(selectButton);
                 row.appendChild(actionCell);
 
