@@ -49,7 +49,10 @@ if (cri_div.dataset.loaded_once === undefined) {
         if (this.readyState == 4 && this.status == 200) {
             let flavorValues = JSON.parse(this.responseText)['flavors'];
             flavorValues.filter(
-                flavor => !flavor.name.startsWith("reservation:")
+                // Filter out flavors with blazar extra spec set
+                flavor => !Object.keys(flavor.extra_specs).some(
+                    es => es.startsWith("resources:CUSTOM_RESERVATION_")
+                )
             ).forEach(flavor => {
                 const row = document.createElement('tr');
 
@@ -74,7 +77,7 @@ if (cri_div.dataset.loaded_once === undefined) {
                 row.appendChild(diskCell);
 
                 const gpuCell = document.createElement('td');
-                gpuCell.textContent = flavor["resources:VGPU"] || "";
+                gpuCell.textContent = flavor["extra_specs"]["resources:VGPU"] || "";
                 row.appendChild(gpuCell);
 
                 const actionCell = document.createElement('td');
