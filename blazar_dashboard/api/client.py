@@ -529,8 +529,8 @@ def device_extra_capabilities(request):
 
 
 def flavors(request):
-    # NOTE we need >=v2.55 (pre-Queens) for flavor description, which will be useful for users.
-    flavors = _nova.novaclient(request, version="2.55").flavors.list()
+    # NOTE we need >=v2.61 (Queens) for flavor description, which will be useful for users.
+    flavors = _nova.novaclient(request, version="2.61").flavors.list()
     return [f.to_dict() for f in flavors]
 
 
