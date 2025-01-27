@@ -106,8 +106,6 @@ if (cri_div.dataset.loaded_once === undefined) {
     xhr.open('GET', 'flavors.json', true);
     xhr.send();
 
-    // TODO fix this stuff with switchableClass, problably needs to come into this file
-	// capabilitiesjs('flavor', cri_div.dataset.switchableClass);
 	cri_div.dataset.loaded_once = true;
 } else {
 	console.log('blocked reload of widget code :/');
