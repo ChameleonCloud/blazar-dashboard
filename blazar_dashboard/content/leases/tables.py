@@ -79,6 +79,14 @@ class ViewDeviceReservationCalendar(tables.LinkAction):
     icon = "calendar"
 
 
+class ViewFlavorReservationCalendar(tables.LinkAction):
+    name = "flavor_calendar"
+    verbose_name = _("Flavor Calendar")
+    url = "calendar/flavor/"
+    classes = ("btn-default", )
+    icon = "calendar"
+
+
 class DeleteLease(tables.DeleteAction):
     name = "delete"
     data_type_singular = _("Lease")
@@ -142,5 +150,7 @@ class LeasesTable(tables.DataTable):
             table_actions.insert(0, ViewHostReservationCalendar)
         if conf.device_reservation.get('enabled'):
             table_actions.insert(0, ViewDeviceReservationCalendar)
+        if conf.flavor_reservation.get('enabled'):
+            table_actions.insert(0, ViewFlavorReservationCalendar)
 
         row_actions = (UpdateLease, DeleteLease, )
