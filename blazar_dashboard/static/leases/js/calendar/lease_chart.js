@@ -137,13 +137,13 @@
 	// Fix network segment_id to string
 	if (selector === '#blazar-calendar-network') {
 	  resp.resources.forEach(function (resource) {
-	      let newResource = Object.assign({}, resource);
-	      newResource[rowAttr] = newResource[rowAttr].toString();
-	      fixedResources.push(newResource);
+	      resource[rowAttr] = resource[rowAttr].toString();
 	  });
-	} else {
-	  fixedResources = resp.resources;
+    resp.reservations.forEach(function (reservation) {
+      reservation[rowAttr] = reservation[rowAttr].toString();
+    });
 	}
+  fixedResources = resp.resources;
 	currentResources = fixedResources;
 	resources = fixedResources;
 
@@ -155,6 +155,7 @@
             }
           })
         });
+        console.log(reservationsWithResources)
         var reservationsById = {}
         reservationsWithResources.forEach(function (reservation) {
           if (!(reservation.id in reservationsById)) {
@@ -172,6 +173,7 @@
             ],
           }
           newReservation[chooserAttr] = reservation[chooserAttr]
+          console.log(newReservation)
           reservationsById[reservation.id].data.push(newReservation)
         })
         // Dummy data to force rendering of all resources
@@ -205,7 +207,6 @@
         } else {
           chooser.hide()
         }
-
         constructCalendar(filteredReservations, computeTimeDomain(7))
       })
       .fail(function () {
