@@ -155,7 +155,6 @@
             }
           })
         });
-        console.log(reservationsWithResources)
         var reservationsById = {}
         reservationsWithResources.forEach(function (reservation) {
           if (!(reservation.id in reservationsById)) {
@@ -173,7 +172,6 @@
             ],
           }
           newReservation[chooserAttr] = reservation[chooserAttr]
-          console.log(newReservation)
           reservationsById[reservation.id].data.push(newReservation)
         })
         // Dummy data to force rendering of all resources
