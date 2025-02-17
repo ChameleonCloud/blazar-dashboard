@@ -43,12 +43,12 @@
       nodeTypesPretty.forEach(function (nt) {
         if (availableResourceTypes[nt[0]]) {
           chooser.append(
-              new Option(
-                  nt[1],
-                  nt[0],
-                  nt[0] === "compute_skylake",
-                  nt[0] === "compute_skylake" // Set selected
-              )
+            new Option(
+              nt[1],
+              nt[0],
+              nt[0] === "compute_skylake",
+              nt[0] === "compute_skylake" // Set selected
+            )
           );
           delete availableResourceTypes[nt[0]];
         }
@@ -59,12 +59,12 @@
     selector = '#blazar-calendar-network'
     pluralResourceType = gettext("Networks")
     rowAttr = "segment_id";
-    
+
     chooserAttr = "network_type";
     chooserAttrPretty = gettext("Network Type");
     populateChooser = function (chooser, availableResourceTypes) {
       const networkTypesPretty = [
-          ['vlan', gettext("VLAN")],
+        ['vlan', gettext("VLAN")],
       ];
       networkTypesPretty.forEach((nt) => {
         if (availableResourceTypes[nt[0]]) {
@@ -134,18 +134,18 @@
       .done(function (resp) {
         projectId = resp.project_id;
 
-	// Fix network segment_id to string
-	if (selector === '#blazar-calendar-network') {
-	  resp.resources.forEach(function (resource) {
-	      resource[rowAttr] = resource[rowAttr].toString();
-	  });
-    resp.reservations.forEach(function (reservation) {
-      reservation[rowAttr] = reservation[rowAttr].toString();
-    });
-	}
-  fixedResources = resp.resources;
-	currentResources = fixedResources;
-	resources = fixedResources;
+        // Fix network segment_id to string
+        if (selector === '#blazar-calendar-network') {
+          resp.resources.forEach(function (resource) {
+            resource[rowAttr] = resource[rowAttr].toString();
+          });
+          resp.reservations.forEach(function (reservation) {
+            reservation[rowAttr] = reservation[rowAttr].toString();
+          });
+        }
+        fixedResources = resp.resources;
+        currentResources = fixedResources;
+        resources = fixedResources;
 
         var reservationsWithResources = resp.reservations;
         reservationsWithResources.forEach(function (reservation) {
