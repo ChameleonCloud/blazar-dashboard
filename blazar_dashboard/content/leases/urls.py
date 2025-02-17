@@ -21,7 +21,8 @@ LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 
 urlpatterns = [
     re_path(r'^calendar/(?P<resource_type>(host|device|network))/$', leases_views.CalendarView.as_view(), name='calendar'),
-    re_path(r'^calendar/(?P<resource_type>(host|device|network))/resources\.json$', leases_views.calendar_data_view,
+    re_path(r'^calendar/flavor/$', leases_views.FlavorCalendarView.as_view(), name='flavor_calendar'),
+    re_path(r'^calendar/(?P<resource_type>(host|device|network|flavor))/resources\.json$', leases_views.calendar_data_view,
         name='calendar_data'),
 
     re_path(r'^(?P<resource_type>[^/]+)/extras\.json$',
