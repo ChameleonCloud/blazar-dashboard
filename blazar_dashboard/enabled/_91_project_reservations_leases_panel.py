@@ -28,6 +28,7 @@ ADD_SCSS_FILES = [
 
 ADD_JS_FILES = [
     'leases/js/calendar/lease_chart.js',
+    'leases/js/calendar/lease_flavor_chart.js',
     'leases/js/vendor/apexcharts.min.js',
     'leases/js/create_lease/extra_capability_widget.js',
     'leases/js/create_lease/workflow.js',
