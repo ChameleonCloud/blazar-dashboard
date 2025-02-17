@@ -415,6 +415,7 @@ def reservation_calendar(request):
             id=reservation['id'],
             status=reservation.get('status'),
             hypervisor_hostname=hosts_by_id[resource_id].hypervisor_hostname,
+            usage=reservation.get("usage"),
             node_name=compute_host_display_name(hosts_by_id[resource_id]))
         # Only include "extras" for reservations in the current project
         if request.user.project_id == reservation.get('project_id'):
@@ -433,6 +434,13 @@ def reservation_calendar(request):
 
     return compute_hosts, list(chain(*host_reservations))
 
+
+def flavor_reservation_calendar(request):
+    hosts, reservations = reservation_calendar(request)
+    return {
+        "hosts": hosts,
+        "flavors": flavors(request),
+    }, reservations
 
 def network_reservation_calendar(request):
     """Return a list of all scheduled network leases."""
