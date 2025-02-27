@@ -176,6 +176,7 @@ def lease_update(request, lease_id, **kwargs):
 
 def lease_delete(request, lease_id):
     """Delete a lease."""
+    LOG.warning("User %s is deleting lease %s", request.user.username, lease_id)
     blazarclient(request).lease.delete(lease_id)
 
 
