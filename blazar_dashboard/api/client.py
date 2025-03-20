@@ -385,7 +385,10 @@ def reservation_calendar(request):
             status=reservation.get('status'),
             hypervisor_hostname=hosts_by_id[resource_id].hypervisor_hostname,
             node_name=compute_host_display_name(hosts_by_id[resource_id]))
-
+        # Only include "extras" for reservations in the current project
+        if request.user.project_id == reservation.get('project_id'):
+            host_reservation["extras"] = [(PRETTY_EXTRA_LABELS.get(key, key), value)
+                    for key, value in reservation.get("extras").items()]
         return {k: v for k, v in host_reservation.items() if v is not None}
 
     host_reservations = [
