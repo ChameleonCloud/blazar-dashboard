@@ -505,14 +505,14 @@ def flavors(request):
     flavors = _nova.novaclient(request, version="2.61").flavors.list()
 
     # If trait is set, filter flavors to just those with it required
-    trait = f"trait:{conf.flavor_reservation.get('blazar_flavor_reservation_trait')}"
+    trait = conf.flavor_reservation.get('blazar_flavor_reservation_trait')
     flavor_dicts = [
         f.to_dict() for f in flavors
     ]
     return [
         f for f in flavor_dicts
         if trait and f.get('extra_specs', {}).get(
-            trait
+            f"trait:{trait}"
         ) == "required"
     ]
 
