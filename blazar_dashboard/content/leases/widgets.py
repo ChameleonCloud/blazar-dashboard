@@ -1,5 +1,6 @@
 import datetime
 
+from blazar_dashboard import conf
 import collections
 from django.forms.widgets import Widget
 from django.template import loader
@@ -84,10 +85,15 @@ class FlavorSelectWidget(Widget):
         super(FlavorSelectWidget, self).__init__(*args, **kwargs)
 
     def get_context(self, value, attrs=None):
-        return {'widget': {
-            'value': value,
-            'switchable_class': self.switchable_class
-        }}
+        return {
+            'widget': {
+                'value': value,
+                'switchable_class': self.switchable_class,
+            },
+            'blazar_flavor_reservation_trait': conf.flavor_reservation.get(
+                'blazar_flavor_reservation_trait'
+            )
+        }
 
     def render(self, name, value, attrs=None, renderer=None):
         context = self.get_context(value, attrs)
