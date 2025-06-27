@@ -17,7 +17,6 @@ import re
 from pytz import UTC
 
 from blazarclient import client as blazar_client
-from blazar_dashboard import conf
 from collections import OrderedDict
 from django.utils.translation import gettext_lazy as _
 from horizon import exceptions
@@ -503,18 +502,7 @@ def device_extra_capabilities(request):
 def flavors(request):
     # NOTE we need >=v2.61 (Queens) for flavor description, which will be useful for users.
     flavors = _nova.novaclient(request, version="2.61").flavors.list()
-
-    # If trait is set, filter flavors to just those with it required
-    trait = f"trait:{conf.flavor_reservation.get('blazar_flavor_reservation_trait')}"
-    flavor_dicts = [
-        f.to_dict() for f in flavors
-    ]
-    return [
-        f for f in flavor_dicts
-        if trait and f.get('extra_specs', {}).get(
-            trait
-        ) == "required"
-    ]
+    return [f.to_dict() for f in flavors]
 
 
 def get_floatingip_network_id(request, network_name_regex):

@@ -23,5 +23,4 @@ device_reservation = (
 flavor_reservation = (
     getattr(settings, 'OPENSTACK_BLAZAR_FLAVOR_RESERVATION', {
         'enabled': False,
-        'blazar_flavor_reservation_trait': '',
     }))
