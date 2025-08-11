@@ -365,6 +365,10 @@ def compute_host_display_name(host):
     return getattr(host, 'node_name', 'node{}'.format(host.id))
 
 
+def compute_host_display_type(host):
+    return getattr(host, 'node_type', 'unknown')
+
+
 def nodes_in_lease(request, lease):
     """Return list of hypervisor_hostnames in a lease."""
     if not any(
@@ -398,7 +402,7 @@ def reservation_calendar(request):
         host_dict = dict(
             hypervisor_hostname=h.hypervisor_hostname, vcpus=h.vcpus,
             memory_mb=h.memory_mb, local_gb=h.local_gb, cpu_info=h.cpu_info,
-            hypervisor_type=h.hypervisor_type, node_type=h.node_type,
+            hypervisor_type=h.hypervisor_type, node_type=compute_host_display_type(h),
             node_name=compute_host_display_name(h), reservable=h.reservable)
         # Copy these keys if they exist
         for key in ["authorized_projects", "restricted_reason"]:
