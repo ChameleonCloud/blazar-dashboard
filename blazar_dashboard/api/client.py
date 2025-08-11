@@ -11,6 +11,7 @@
 #    under the License.
 
 from collections import OrderedDict
+import asyncio
 from datetime import datetime
 from datetime import timezone
 from itertools import chain
@@ -28,6 +29,7 @@ from keystoneauth1 import session
 from openstack_dashboard.api import base
 from openstack_dashboard.api import neutron
 from openstack_dashboard.api import _nova
+from openstack_dashboard.api import placement
 
 
 LOG = logging.getLogger(__name__)
@@ -437,9 +439,43 @@ def reservation_calendar(request):
 
 def flavor_reservation_calendar(request):
     hosts, reservations = reservation_calendar(request)
+
+    async def fetch_async_data():
+        async def fetch_resource_providers():
+            try:
+                return placement.resource_providers(request)
+            except Exception as e:
+                # If there is an issue with placment API, ignore it
+                return []
+
+        async def fetch_flavors():
+            return flavors(request)
+
+        async def fetch_traits(rp):
+            try:
+                rp["traits"] = placement.resource_provider_traits(
+                    request, rp["uuid"])
+            except Exception as e:
+                # If there is an issue with placment API, ignore it
+                return []
+
+        flavors_task = fetch_flavors()
+        rps = await fetch_resource_providers()
+        host_tasks = [fetch_traits(rp) for rp in rps]
+        *_, flavor_result = await asyncio.gather(*host_tasks, flavors_task)
+        return rps, flavor_result
+
+    # Fetch flavors and host traits. Hosts list is updated in place
+    resource_providers, f = asyncio.run(fetch_async_data())
+    rp_by_name = {
+        rp["name"]: rp for rp in resource_providers
+    }
+    for host in hosts:
+        host["traits"] = rp_by_name.get(
+            host["hypervisor_hostname"], {}).get("traits")
     return {
         "hosts": hosts,
-        "flavors": flavors(request),
+        "flavors": f,
     }, reservations
 
 def network_reservation_calendar(request):
