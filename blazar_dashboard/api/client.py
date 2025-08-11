@@ -434,7 +434,14 @@ def flavor_reservation_calendar(request):
                 return []
 
         async def fetch_flavors():
-            return flavors(request)
+            # Filter flavors to exclude reserved flavors
+            return [
+                f for f in flavors(request)
+                if not any(
+                    k.startswith("resources:CUSTOM_RESERVATION_")
+                    for k in f["extra_specs"].keys()
+                )
+            ]
 
         async def fetch_traits(rp):
             try:
