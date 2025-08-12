@@ -23,7 +23,6 @@ from blazar_dashboard.content.leases import workflows as project_workflows
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import RedirectView
 from horizon import exceptions
@@ -57,6 +56,7 @@ class CalendarView(views.APIView):
         "host": _("Host Calendar"),
         "network": _("Network Calendar"),
         "device": _("Device Calendar"),
+        "flavor": _("Flavor Calendar"),
     }
 
     def get_data(self, request, context, *args, **kwargs):
@@ -64,11 +64,20 @@ class CalendarView(views.APIView):
         return context
 
 
+class FlavorCalendarView(views.APIView):
+    template_name = "project/leases/calendar_flavor.html"
+
+    def get_data(self, request, context, *args, **kwargs):
+        context["calendar_title"] = _("Flavor Calendar")
+        return context
+
+
 def calendar_data_view(request, resource_type):
     api_mapping = {
         "host": api.client.reservation_calendar,
         "network": api.client.network_reservation_calendar,
-        "device": api.client.device_reservation_calendar
+        "device": api.client.device_reservation_calendar,
+        "flavor": api.client.flavor_reservation_calendar,
     }
     data = {}
     resources, reservations = api_mapping[resource_type](request)
@@ -92,6 +101,10 @@ def extra_capabilities(request, resource_type):
     data = {
         'extra_capabilities': extra_capabilities}
     return JsonResponse(data)
+
+
+def flavors(request):
+    return JsonResponse({'flavors': api.client.flavors(request)})
 
 
 class DetailView(tabs.TabView):
