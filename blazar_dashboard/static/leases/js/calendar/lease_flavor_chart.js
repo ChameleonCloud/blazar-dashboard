@@ -32,9 +32,17 @@
         function maxInstances(flavorId) {
           // Max number of this flavor across all instances
           let flavor = resp.resources.flavors.find(f => f.id === flavorId);
+
           return resp.resources.hosts.reduce(function (accumulator, host) {
             let totalVCPUs = host.vcpus;
             let totalMemory = host.memory_mb;
+
+            if (!passesTraits(flavor, host)) {
+              // Host contributes 0 to capacity if traits don't match
+              totalVCPUs = 0
+              totalMemory = 0;
+            }
+
             return accumulator + Math.min(
               Math.floor(totalVCPUs / flavor.vcpus),
               Math.floor(totalMemory / flavor.ram)
@@ -60,6 +68,23 @@
           }, []);
         }
 
+        function passesTraits(flavor, host){
+          let ret = true;
+          Object.keys(flavor["extra_specs"]).forEach(key => {
+            let value = flavor["extra_specs"][key];
+            if (key.startsWith("trait:")) {
+              let trait = key.split(":")[1];
+              let hostHasTrait = host["traits"].includes(trait);
+              if (value == "forbidden" && hostHasTrait) {
+                ret = false
+              } else if (value == "required" && !hostHasTrait) {
+                ret = false
+              }
+            }
+          })
+          return ret;
+        }
+
         function calculateAvailability(flavorId) {
           // Calculate the availability over time of this flavor
           // Outline: For each host
@@ -74,6 +99,11 @@
 
           let instanceChangeEvents = []
           resp.resources.hosts.forEach(host => {
+            if (!passesTraits(flavor, host)) {
+              // Ignore reservations on incompatible hosts
+              return
+            }
+
             // Calculate delta vcpus/memory at each reservation event
             let hostEvents = []
             resp.reservations.filter(r => r.hypervisor_hostname === host.hypervisor_hostname).forEach(reservation => {
