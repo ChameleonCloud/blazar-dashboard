@@ -106,6 +106,16 @@ class DeleteLease(tables.DeleteAction):
         api.client.lease_delete(request, lease_id)
 
 
+# class LeaseFilterAction(tables.FilterAction):
+#     name = "filter_leases"
+#     filter_type = "server"
+#     filter_choices = (
+#         ('project', _("Project Name ="), True),
+#         ('tenant_id', _("Project ID ="), True),
+#         ('status', _("Status ="), True),
+#     )
+
+
 class LeasesTable(tables.DataTable):
     name = tables.Column("name", verbose_name=_("Lease name"),
                          link="horizon:project:leases:detail",)
@@ -126,8 +136,11 @@ class LeasesTable(tables.DataTable):
     class Meta(object):
         name = "leases"
         verbose_name = _("Leases")
+        
+        pagination_param = "marker"
 
-        table_actions = [CreateLease, DeleteLease,]
+        table_actions = [CreateLease, DeleteLease, ]
+        # table_actions = [CreateLease, DeleteLease, LeaseFilterAction,]
         if conf.floatingip_reservation.get('enabled'):
             # TODO: put in floating IP calendar support
             pass

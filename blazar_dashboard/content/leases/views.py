@@ -36,19 +36,36 @@ from horizon.utils import memoized
 
 LOG = logging.getLogger(__name__)
 
-class IndexView(tables.DataTableView):
+class IndexView(tables.PagedTableMixin, tables.DataTableView):
     table_class = project_tables.LeasesTable
     template_name = 'project/leases/index.html'
 
+    def get_data_kwargs(self):
+        # filter_string = self.request.GET.get(
+        #     tables.FilterAction.get_param_name(self.table_class), None)
+        # LOG.warning("GET BLAZAR LEASE DATA")
+        # LOG.warning(f"Filter string: {filter_string}")
+        return {
+            'all_tenants': False,
+            "marker": self.request.GET.get(
+                project_tables.LeasesTable._meta.pagination_param, None),
+            "limit": 10,
+       }
+
     def get_data(self):
         try:
-            leases = api.client.lease_list(self.request)
+            leases = api.client.lease_list(
+                self.request,
+                **self.get_data_kwargs(),
+            )
+            limit = self.get_data_kwargs()['limit']
+            self._has_more_data = len(leases) == limit
         except Exception:
             leases = []
+            self._has_more_data = False
             msg = _('Unable to retrieve lease information.')
             exceptions.handle(self.request, msg)
         return leases
-
 
 class CalendarView(views.APIView):
     template_name = 'project/leases/calendar.html'
