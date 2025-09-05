@@ -106,14 +106,14 @@ class DeleteLease(tables.DeleteAction):
         api.client.lease_delete(request, lease_id)
 
 
-# class LeaseFilterAction(tables.FilterAction):
-#     name = "filter_leases"
-#     filter_type = "server"
-#     filter_choices = (
-#         ('project', _("Project Name ="), True),
-#         ('tenant_id', _("Project ID ="), True),
-#         ('status', _("Status ="), True),
-#     )
+class LeaseFilterAction(tables.FilterAction):
+    name = "filter_leases"
+    filter_type = "server"
+    filter_choices = (
+        ('status', _("Status ="), True),
+        ('lease_name', _("Lease Name ="), True),
+        ('lease_id', _("Lease ID ="), True)
+    )
 
 
 class LeasesTable(tables.DataTable):
@@ -139,8 +139,8 @@ class LeasesTable(tables.DataTable):
         
         pagination_param = "marker"
 
-        table_actions = [CreateLease, DeleteLease, ]
-        # table_actions = [CreateLease, DeleteLease, LeaseFilterAction,]
+        # table_actions = [CreateLease, DeleteLease, ]
+        table_actions = [CreateLease, DeleteLease, LeaseFilterAction, ]
         if conf.floatingip_reservation.get('enabled'):
             # TODO: put in floating IP calendar support
             pass

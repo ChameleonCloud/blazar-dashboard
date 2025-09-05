@@ -41,15 +41,14 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
     template_name = 'project/leases/index.html'
 
     def get_data_kwargs(self):
-        # filter_string = self.request.GET.get(
-        #     tables.FilterAction.get_param_name(self.table_class), None)
-        # LOG.warning("GET BLAZAR LEASE DATA")
-        # LOG.warning(f"Filter string: {filter_string}")
+        # User applied filters
+        filters = self.get_filters()
         return {
             'all_tenants': False,
             "marker": self.request.GET.get(
-                project_tables.LeasesTable._meta.pagination_param, None),
+                self.table_class._meta.pagination_param, None),
             "limit": 10,
+            **filters,
        }
 
     def get_data(self):

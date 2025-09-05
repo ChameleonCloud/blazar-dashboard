@@ -18,6 +18,7 @@ import logging
 from blazar_dashboard import api
 from blazar_dashboard.api import client
 from blazar_dashboard.content.leases import tables as project_tables
+from blazar_dashboard.content.leases.admin import tables as admin_tables
 from blazar_dashboard.content.leases import tabs as project_tabs
 from blazar_dashboard.content.leases import workflows as project_workflows
 from django.http import JsonResponse
@@ -38,6 +39,8 @@ from blazar_dashboard.content.leases import views
 LOG = logging.getLogger(__name__)
 
 class IndexView(views.IndexView):
+    table_class = admin_tables.AdminLeasesTable
+
     def get_data_kwargs(self):
         kwargs = super().get_data_kwargs()
         kwargs['all_tenants'] = True

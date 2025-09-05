@@ -149,11 +149,26 @@ def blazarclient(request):
         auth_token=request.user.token.id)
 
 
-def lease_list(request, all_tenants=False, limit=None, marker=None):
+def lease_list(
+    request,
+    all_tenants=False,
+    status=None,
+    project_id=None,
+    lease_name=None,
+    lease_id=None,
+    limit=None,
+    marker=None,
+):
     """List the leases."""
-    LOG.warning("BLAZAR LIST LEASE")
-    LOG.warning("all_tenants: %s, limit: %s, marker: %s", all_tenants, limit, marker)
-    leases = blazarclient(request).lease.list(all_tenants=all_tenants, limit=limit, marker=marker)
+    leases = blazarclient(request).lease.list(
+        all_tenants=all_tenants,
+        status=status,
+        limit=limit,
+        project_id=project_id,
+        lease_id=lease_id,
+        lease_name=lease_name,
+        marker=marker,
+    )
     return [Lease(l) for l in leases]
 
 
