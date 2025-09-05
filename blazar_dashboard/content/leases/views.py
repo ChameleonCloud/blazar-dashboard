@@ -16,6 +16,7 @@ import logging
 
 
 from blazar_dashboard import api
+from blazar_dashboard import conf
 from blazar_dashboard.api import client
 from blazar_dashboard.content.leases import tables as project_tables
 from blazar_dashboard.content.leases import tabs as project_tabs
@@ -47,7 +48,7 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
             'all_tenants': False,
             "marker": self.request.GET.get(
                 self.table_class._meta.pagination_param, None),
-            "limit": 10,
+            "limit": conf.api_limit,
             **filters,
        }
 
@@ -65,6 +66,7 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
             msg = _('Unable to retrieve lease information.')
             exceptions.handle(self.request, msg)
         return leases
+
 
 class CalendarView(views.APIView):
     template_name = 'project/leases/calendar.html'

@@ -13,19 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 import logging
-from datetime import datetime
 
-import pytz
-
-from blazar_dashboard import api
-from blazar_dashboard import conf
-from django.template import defaultfilters as django_filters
-from django.utils.translation import gettext_lazy as _
-from django.utils.translation import ngettext_lazy
-from functools import partial
-from horizon import tables
-from horizon.utils import filters
 from blazar_dashboard.content.leases import tables as project_tables
+from django.utils.translation import gettext_lazy as _
 
 LOG = logging.getLogger(__name__)
 

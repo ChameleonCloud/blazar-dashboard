@@ -136,10 +136,7 @@ class LeasesTable(tables.DataTable):
     class Meta(object):
         name = "leases"
         verbose_name = _("Leases")
-        
         pagination_param = "marker"
-
-        # table_actions = [CreateLease, DeleteLease, ]
         table_actions = [CreateLease, DeleteLease, LeaseFilterAction, ]
         if conf.floatingip_reservation.get('enabled'):
             # TODO: put in floating IP calendar support

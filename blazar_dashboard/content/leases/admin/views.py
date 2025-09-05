@@ -15,26 +15,9 @@
 import logging
 
 
-from blazar_dashboard import api
-from blazar_dashboard.api import client
-from blazar_dashboard.content.leases import tables as project_tables
 from blazar_dashboard.content.leases.admin import tables as admin_tables
-from blazar_dashboard.content.leases import tabs as project_tabs
-from blazar_dashboard.content.leases import workflows as project_workflows
-from django.http import JsonResponse
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.urls import reverse_lazy
-from django.utils.translation import gettext_lazy as _
-from django.views.generic import RedirectView
-from horizon import exceptions
-from horizon import messages
-from horizon import tables
-from horizon import tabs
-from horizon import views
-from horizon import workflows
-from horizon.utils import memoized
 from blazar_dashboard.content.leases import views
+from django.utils.translation import gettext_lazy as _
 
 LOG = logging.getLogger(__name__)
 

@@ -13,22 +13,9 @@
 # The slug of the panel to be added to HORIZON_CONFIG. Required.
 PANEL = 'leases'
 # The slug of the panel group the PANEL is associated with.
-PANEL_GROUP = 'reservations'
+PANEL_GROUP = 'reservation'
 # The slug of the dashboard the PANEL associated with. Required.
 PANEL_DASHBOARD = 'admin'
 
 # Python panel class of the PANEL to be added.
 ADD_PANEL = 'blazar_dashboard.content.leases.admin.panel.Leases'
-
-ADD_SCSS_FILES = [
-    'leases/scss/calendar.scss',
-    'leases/scss/detail_overview.scss',
-    'leases/scss/widgets.scss',
-]
-
-ADD_JS_FILES = [
-    'leases/js/calendar/lease_chart.js',
-    'leases/js/vendor/apexcharts.min.js',
-    'leases/js/create_lease/extra_capability_widget.js',
-    'leases/js/create_lease/workflow.js',
-]
