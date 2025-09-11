@@ -13,13 +13,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from blazar_dashboard.content.leases.admin import views as leases_views
+from blazar_dashboard.content.leases.admin import views as admin_views
+from blazar_dashboard.content.leases import views as leases_views
 from django.urls import re_path
 
 LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 
 urlpatterns = [
-    re_path(r'^$', leases_views.IndexView.as_view(), name='index'),
+    re_path(r'^$', admin_views.IndexView.as_view(), name='index'),
     re_path(LEASE_URL % '', leases_views.DetailView.as_view(),
         name='detail'),
     re_path(LEASE_URL % 'update', leases_views.UpdateView.as_view(),

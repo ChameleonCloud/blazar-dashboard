@@ -17,7 +17,6 @@ import logging
 
 from blazar_dashboard.content.leases.admin import tables as admin_tables
 from blazar_dashboard.content.leases import views
-from django.utils.translation import gettext_lazy as _
 
 LOG = logging.getLogger(__name__)
 
@@ -28,12 +27,3 @@ class IndexView(views.IndexView):
         kwargs = super().get_data_kwargs()
         kwargs['all_tenants'] = True
         return kwargs
-
-class DetailView(views.DetailView):
-    pass
-
-class UpdateView(views.UpdateView):
-    pass
-
-class ReallocateView(views.RedirectView):
-    pass
