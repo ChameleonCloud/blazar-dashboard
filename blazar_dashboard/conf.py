@@ -19,3 +19,5 @@ device_reservation = (
     getattr(settings, 'OPENSTACK_BLAZAR_DEVICE_RESERVATION', {
         'enabled': False,
     }))
+
+api_limit = getattr(settings, 'OPENSTACK_BLAZAR_API_LIMIT', 20)
