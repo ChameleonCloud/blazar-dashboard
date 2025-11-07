@@ -19,6 +19,7 @@
     pluralResourceType = gettext("Hosts");
     chooserAttr = "node_type";
     chooserAttrPretty = gettext("Node Type");
+    var preselectedNodeType = new URLSearchParams(window.location.search).get('node_type') || "compute_skylake";
     populateChooser = function (chooser, availableResourceTypes) {
       var nodeTypesPretty = [ // preserve order so it's not random
         ['compute', gettext('Compute Node')],
@@ -42,12 +43,13 @@
       ];
       nodeTypesPretty.forEach(function (nt) {
         if (availableResourceTypes[nt[0]]) {
+          var isSelected = nt[0] === preselectedNodeType;
           chooser.append(
             new Option(
               nt[1],
               nt[0],
-              nt[0] === "compute_skylake",
-              nt[0] === "compute_skylake" // Set selected
+              isSelected,
+              isSelected
             )
           );
           delete availableResourceTypes[nt[0]];
@@ -200,6 +202,10 @@
           Object.keys(availableResourceTypes).forEach(function (key) {
             chooser.append(new Option(key, key));
           });
+          // Set the dropdown value to the preselected node type if it exists in the options
+          if (preselectedNodeType && chooser.find("option[value='" + preselectedNodeType + "']").length) {
+            chooser.val(preselectedNodeType);
+          }
           chooser.prop('disabled', false);
           chooser.change(onCalendarFilterChange);
         } else {
@@ -227,6 +233,16 @@
           },
           events: {
             updated: function (chartContext, config) {
+              $('.apexcharts-yaxis-label').css('cursor', 'pointer').off('click').on('click', function(e) {
+                  var nodeName = $(this).text();
+                  var createUrl = '../../create/?node_name=' + encodeURIComponent(nodeName);
+                  var link = document.createElement('a');
+                  link.setAttribute('href', createUrl);
+                  link.setAttribute('class', 'ajax-modal');
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+              });
               $(`rect.apexcharts-grid-row[fill='${RESTRICTED_BACKGROUND_COLOR}']`).mouseout(function (event) {
                 $("#resource-disabled-tooltip").hide();
               });

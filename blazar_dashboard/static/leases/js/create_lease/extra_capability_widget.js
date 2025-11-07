@@ -1,6 +1,6 @@
 function capabilitiesjs(resource_type, switchable_classname) {
     'use strict';
-    
+
     var defaults = {'computehost': {'node_type': 'compute_skylake'},
     		        'network': {'physical_network': 'physnet1'},
     		        'device': {'vendor': 'Raspberry Pi'}

@@ -4,7 +4,6 @@ import pytz
 
 from blazar_dashboard import api
 from blazar_dashboard import conf
-from django import template
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from horizon import exceptions
@@ -222,6 +221,7 @@ class SetHostsAction(workflows.Action):
         required=False,
         help_text=_('Choose properties of the resource(s) to reserve.'),
         max_length=1024,
+        initial='node_type == compute_skylake',
         widget=widgets.CapabilityWidget(
             switchable_class='create-lease-switch-on-computehost',
             resource_type='computehost')
@@ -231,6 +231,30 @@ class SetHostsAction(workflows.Action):
         name = _("Hosts")
         help_text_template = ("project/leases/create_lease/"
                               "_host_help.html")
+
+    def __init__(self, request, context, *args, **kwargs):
+        self.request = request
+        self.context = context
+
+        # Check for node_name query parameter to override default resource properties
+        node_name = request.GET.get('node_name')
+        if node_name:
+            # Pre-fill with node_name filter in plain text format
+            if 'initial' not in kwargs:
+                kwargs['initial'] = {}
+            kwargs['initial']['computehost_resource_properties'] = 'node_name == ' + node_name
+            kwargs['initial']['with_computehost'] = True
+            kwargs['initial']['min_hosts'] = 1
+            kwargs['initial']['max_hosts'] = 1
+        else:
+            # No query param, but still set the other defaults
+            if 'initial' not in kwargs:
+                kwargs['initial'] = {}
+            kwargs['initial']['with_computehost'] = True
+            kwargs['initial']['min_hosts'] = 1
+            kwargs['initial']['max_hosts'] = 1
+
+        super().__init__(request, context, *args, **kwargs)
 
     def clean(self):
         cleaned_data = super(SetHostsAction, self).clean()
@@ -499,8 +523,10 @@ class CreateLease(workflows.Workflow):
         reservations = []
         if (data.get('with_computehost', False) and
             conf.host_reservation.get('enabled', False) and
-                data['min_hosts'] > 0 and data['max_hosts'] > 0):
+            data['min_hosts'] > 0 and data['max_hosts'] > 0
+        ):
             res_props = data.get('computehost_resource_properties', '')
+
             reservations.append(
                 {
                     'resource_type': 'physical:host',
@@ -509,11 +535,15 @@ class CreateLease(workflows.Workflow):
                     'hypervisor_properties': '',
                     'resource_properties': res_props,
                 })
+
         if (data.get('with_floatingip', False) and
             conf.floatingip_reservation.get('enabled', False) and
-                data['network_ip_count'] > 0):
+            data['network_ip_count'] > 0
+        ):
             network_id = api.client.get_floatingip_network_id(
-                request, conf.floatingip_reservation.get('network_name_regex'))
+                request,
+                conf.floatingip_reservation.get('network_name_regex')
+            )
             reservations.append(
                 {
                     'resource_type': 'virtual:floatingip',
@@ -521,9 +551,11 @@ class CreateLease(workflows.Workflow):
                     'amount': data['network_ip_count'],
                 }
             )
+
         if (data.get('with_network', False) and
             conf.network_reservation.get('enabled', False) and
-                data['network_name']):
+            data['network_name']
+        ):
             res_props = data.get('network_resource_properties', '')
             reservations.append(
                 {
@@ -533,9 +565,11 @@ class CreateLease(workflows.Workflow):
                     'network_properties': '',
                     'resource_properties': res_props,
                 })
+
         if (data.get('with_device', False) and
             conf.device_reservation.get('enabled', False) and
-                data['min_devices'] > 0 and data['max_devices'] > 0):
+            data['min_devices'] > 0 and data['max_devices'] > 0
+        ):
             res_props = data.get('device_resource_properties', '')
             reservations.append(
                 {
