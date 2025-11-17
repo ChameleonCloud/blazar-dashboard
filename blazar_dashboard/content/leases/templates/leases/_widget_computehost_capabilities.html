@@ -1,27 +1,303 @@
 <div id="criteria-computehost" style="margin-bottom:50px" data-switchable-class="{{ widget.switchable_class }}">
-    <label id="no-criteria-warning-computehost" class="alert alert-danger" hidden="hidden">
-        <strong>No filters are specified,</strong> random hardware will be
-        assigned. Recommend that you
-        <a href="#" class="cri-adder" data-cri-name="node_type">add a filter for a node type</a>
-        or <a href="#" class="cri-adder" data-cri-name="uid">a specific node ID</a>.
-    </label>
-    <input id="criteria-payload-computehost" form_data="{{ widget.value }}" name="criteria-{{ widget.name }}" type="hidden">
-    <div>
-        <ul id="criteria-list-computehost" class="form-inline" style="padding-inline-start:0px;">
-        </ul>
+    <label>Resource Criteria (e.g., <code style="background-color: #f0f0f0; padding: 2px 4px; border-radius: 4px; color: #000000;">node_type == compute_skylake</code> or <code style="background-color: #f0f0f0; padding: 2px 4px; border-radius: 4px; color: #000000;">memory_mb >= 4096</code>)</label>
+    <div style="position: relative;">
+        <input id="criteria-payload-computehost"
+               type="text"
+               class="form-control"
+               placeholder="Enter filter like: node_type == compute_skylake, memory_mb >= 4096"
+               name="criteria-{{ widget.name }}"
+               value="{{ widget.value }}"
+               autocomplete="off"
+               style="margin-top: 10px; padding-right: 35px;">
+        <span id="validation-icon-computehost"
+              style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 20px; display: none;"></span>
     </div>
-    <button id="criteria-add-computehost" style="margin-top:10px;float:right;" type="button" class="btn btn-sm btn-success {{ widget.switchable_class }}">Add Filter</button>
+
+    <!-- Warning message for empty criteria -->
+    <div id="empty-criteria-warning-computehost"
+         style="margin-top: 10px; padding: 12px 15px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24; display: none;">
+        <strong>⚠️ No filters are specified,</strong> random hardware will be assigned. Recommend that you
+        <a href="#" class="cri-adder" data-cri-name="node_type" style="color: #721c24; text-decoration: underline; font-weight: bold;">add a filter for a node type</a>
+        or
+        <a href="#" class="cri-adder" data-cri-name="uid" style="color: #721c24; text-decoration: underline; font-weight: bold;">a specific node name</a>.
+    </div>
+
+    <small class="form-text text-muted" style="margin-top: 5px;">
+        Format: <code style="background-color: #f0f0f0; padding: 2px 4px; border-radius: 4px; color: #000000;">property &lt;operator&gt; value</code> (e.g., <code style="background-color: #f0f0f0; padding: 2px 4px; border-radius: 4px; color: #000000;">node_name == node4</code>). Operators: <code style="background-color: #f0f0f0; padding: 2px 4px; border-radius: 4px; color: #000000;">==, !=, >=, <=, >, <</code>. Multiple filters separated by commas.
+    </small>
+    <small id="validation-message-computehost" class="form-text" style="margin-top: 5px; display: none; color: #dc3545;"></small>
+    <div id="autocomplete-suggestions-computehost" class="list-group" style="margin-top: 10px; display:none; position: absolute; z-index: 1000; width: 100%; background: white; border: 1px solid #ccc;"></div>
 </div>
 
 <script>
+// Initialize autocomplete for computehost criteria input with validation
+(function() {
+    var input = document.getElementById('criteria-payload-computehost');
+    var suggestionsDiv = document.getElementById('autocomplete-suggestions-computehost');
+    var validationIcon = document.getElementById('validation-icon-computehost');
+    var validationMessage = document.getElementById('validation-message-computehost');
+    var availableProperties = {};
 
-var cri_div = document.querySelector('#criteria-computehost');
-if (cri_div.dataset.loaded_once === undefined) {
-	capabilitiesjs('computehost', cri_div.dataset.switchableClass);
-	cri_div.dataset.loaded_once = true;
-	console.log('loaded criteria widget code')
-} else {
-	console.log('blocked reload of widget code :/');
-}
+    // If no value but we need a default, set it
+    if (!input.value || input.value.trim() === '') {
+        console.log('Setting default value');
+        input.value = 'node_type == compute_skylake';
+    }
 
+    // Load available properties
+    var propertiesLoaded = false;
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            availableProperties = JSON.parse(this.responseText)['extra_capabilities'];
+            propertiesLoaded = true;
+            // Validate after properties are loaded
+            if (input.value && input.value.length > 0) {
+                validateInput(input.value);
+            }
+        }
+    };
+    xhr.open('GET', '/project/leases/computehost/extras.json', true);
+    xhr.send();
+
+    function validateCriteria(criteria) {
+        criteria = criteria.trim();
+        if (!criteria) return null;
+
+        var operators = ['==', '!=', '<=', '>=', '<', '>'];
+        var operator = null;
+
+        for (var i = 0; i < operators.length; i++) {
+            if (criteria.includes(operators[i])) {
+                operator = operators[i];
+                break;
+            }
+        }
+
+        if (!operator) {
+            return 'Must use a valid operator: ' + operators.join(', ') + ' (e.g., node_name == node4)';
+        }
+
+        var parts = criteria.split(operator);
+        if (parts.length !== 2) {
+            return 'Invalid format - use a single operator per criterion.';
+        }
+
+        var propName = parts[0].trim();
+        var propValue = parts[1].trim();
+
+        if (!propName) {
+            return 'Property name is required before "' + operator + '"';
+        }
+        if (!propValue) {
+            return 'Property value is required after "' + operator + '"';
+        }
+
+        if (!propertiesLoaded) {
+            return null; // Cannot validate properties yet
+        }
+
+        if (!(propName in availableProperties)) {
+            return 'Property "' + propName + '" not found. Valid: ' + Object.keys(availableProperties).join(', ');
+        }
+
+        // For '==' and '!=' operators, validate against the list of known string values.
+        if (operator === '==' || operator === '!=') {
+            var validValues = availableProperties[propName];
+            if (validValues && validValues.length > 0 && validValues.indexOf(propValue) === -1) {
+                return 'Value "' + propValue + '" not valid for "' + propName + '". Valid: ' + validValues.join(', ');
+            }
+        }
+        // For other operators like '>', '<', etc., we assume a numeric or free-text value.
+        // Further validation (e.g., ensuring value is a number) could be added here if needed.
+
+        return null;
+    }
+
+    function validateInput(text) {
+        if (!text || text.trim() === '') {
+            validationIcon.style.display = 'none';
+            validationMessage.style.display = 'none';
+            return;
+        }
+
+        // If properties haven't loaded yet, show a pending state
+        if (!propertiesLoaded) {
+            validationIcon.innerHTML = '⏳';
+            validationIcon.style.color = '#ffc107';
+            validationIcon.style.display = 'inline-block';
+            validationMessage.style.display = 'none';
+            return;
+        }
+
+        var criteria = text.split(',');
+        for (var i = 0; i < criteria.length; i++) {
+            var error = validateCriteria(criteria[i]);
+            if (error) {
+                validationIcon.innerHTML = '❌';
+                validationIcon.style.color = '#dc3545';
+                validationIcon.style.display = 'inline-block';
+                validationMessage.innerHTML = error;
+                validationMessage.style.display = 'block';
+                return;
+            }
+        }
+
+        validationIcon.innerHTML = '✅';
+        validationIcon.style.color = '#28a745';
+        validationIcon.style.display = 'inline-block';
+        validationMessage.style.display = 'none';
+    }
+
+    // Handle input changes for autocomplete
+    input.addEventListener('input', function(e) {
+        var value = input.value;
+
+        // Show/hide warning based on whether input is empty
+        var warningDiv = document.getElementById('empty-criteria-warning-computehost');
+        if (!value || value.trim() === '') {
+            warningDiv.style.display = 'block';
+        } else {
+            warningDiv.style.display = 'none';
+        }
+
+        // Validate as user types
+        validateInput(value);
+
+        if (!value || value.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+
+        // Get the last part after the comma (in case of multiple criteria)
+        var lastPart = value.substring(value.lastIndexOf(',') + 1).trim();
+        var beforeComma = value.substring(0, value.lastIndexOf(',') + 1);
+
+        var suggestions = [];
+        var operators = ['==', '!=', '<=', '>=', '<', '>'];
+        var foundOperator = null;
+        var operatorIndex = -1;
+
+        for (var i = 0; i < operators.length; i++) {
+            var idx = lastPart.indexOf(operators[i]);
+            if (idx > 0) {
+                foundOperator = operators[i];
+                operatorIndex = idx;
+                break;
+            }
+        }
+
+        if (foundOperator) {
+            var propName = lastPart.substring(0, operatorIndex).trim();
+            var partialValue = lastPart.substring(operatorIndex + foundOperator.length).trim();
+
+            if ((foundOperator === '==' || foundOperator === '!=') && (propName in availableProperties)) {
+                var values = availableProperties[propName];
+                if (values && values.length > 0) {
+                    for (var i = 0; i < values.length; i++) {
+                        if (values[i].toLowerCase().includes(partialValue.toLowerCase())) {
+                            suggestions.push({
+                                type: 'value',
+                                text: propName + ' ' + foundOperator + ' ' + values[i],
+                                full: beforeComma + propName + ' ' + foundOperator + ' ' + values[i]
+                            });
+                        }
+                    }
+                }
+            }
+        } else {
+            // Show matching property names
+            var currentKey = lastPart.trim();
+            if (currentKey.length > 0) {
+                for (var prop in availableProperties) {
+                    if (prop.includes(currentKey)) {
+                        suggestions.push({
+                            type: 'property',
+                            text: prop + ' == ', // Default to '==' for suggestions
+                            full: beforeComma + prop + ' == '
+                        });
+                    }
+                }
+            }
+        }
+
+        if (suggestions.length > 0) {
+            suggestionsDiv.innerHTML = suggestions.map(function(s) {
+                var label = s.type === 'property' ? '🔹 ' + s.text : '• ' + s.text;
+                return '<button type="button" class="list-group-item list-group-item-action" style="text-align: left; padding: 8px 12px; font-size: 14px;" data-value="' + s.full.replace(/"/g, '&quot;') + '">' + label + '</button>';
+            }).join('');
+            suggestionsDiv.style.display = 'block';
+
+            // Add click handlers
+            var buttons = suggestionsDiv.querySelectorAll('button');
+            buttons.forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var newValue = btn.getAttribute('data-value');
+                    input.value = newValue;
+                    input.focus();
+                    input.dispatchEvent(new Event('input')); // Trigger validation
+                    suggestionsDiv.style.display = 'none';
+                });
+            });
+        } else {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+
+    // Hide suggestions when clicking elsewhere
+    document.addEventListener('click', function(e) {
+        if (e.target !== input && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+
+    // Handle quick-add filter links in the warning
+    var quickAddLinks = document.querySelectorAll('.cri-adder');
+    quickAddLinks.forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            var filterName = link.getAttribute('data-cri-name');
+
+            // Get current value and append new filter
+            var currentValue = input.value.trim();
+            if (currentValue) {
+                // Append with comma separator
+                input.value = currentValue + ', ' + filterName + ' == ';
+            } else {
+                // Start with the filter name
+                input.value = filterName + ' == ';
+            }
+
+            // Focus and trigger input event to show suggestions
+            input.focus();
+            input.dispatchEvent(new Event('input'));
+        });
+    });
+
+    // Trigger validation on page load if there's an initial value
+    window.addEventListener('load', function() {
+        if (input.value && input.value.length > 0) {
+            input.dispatchEvent(new Event('input'));
+        } else {
+            // Show warning if field is empty on load
+            document.getElementById('empty-criteria-warning-computehost').style.display = 'block';
+        }
+    });
+
+    // Also validate immediately if value exists (for cases where load event already fired)
+    if (input.value && input.value.length > 0) {
+        setTimeout(function() {
+            input.dispatchEvent(new Event('input'));
+        }, 100);
+    } else {
+        // Show warning if empty on immediate load
+        setTimeout(function() {
+            var warning = document.getElementById('empty-criteria-warning-computehost');
+            if (!input.value || input.value.trim() === '') {
+                warning.style.display = 'block';
+            }
+        }, 100);
+    }
+})();
 </script>

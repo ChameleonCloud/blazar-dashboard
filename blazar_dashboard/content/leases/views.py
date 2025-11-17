@@ -120,6 +120,16 @@ class DetailView(tabs.TabView):
 class CreateView(workflows.WorkflowView):
     workflow_class = project_workflows.CreateLease
 
+    def get_initial(self):
+        initial = super(CreateView, self).get_initial()
+        node_name = self.request.GET.get('node_name')
+        if node_name:
+            initial['with_computehost'] = True
+            initial['min_hosts'] = 1
+            initial['max_hosts'] = 1
+            initial['computehost_resource_properties'] = f'node_name == {node_name}'
+        return initial
+
 
 class UpdateView(workflows.WorkflowView):
     workflow_class = project_workflows.UpdateLease
@@ -174,5 +184,3 @@ class ReallocateView(RedirectView):
                                   f"for a few more seconds.")
 
         return redirect(next_url)
-
-

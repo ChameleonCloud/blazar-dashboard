@@ -7,6 +7,25 @@
 {% endblock page_header %}
 
 {% block main %}
+<style>
+  .apexcharts-yaxis-label {
+    color: #0066cc !important;
+    fill: #0066cc !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+  }
+  .apexcharts-yaxis-label:hover {
+    opacity: 0.8;
+  }
+  .apexcharts-yaxis text {
+    fill: #0066cc !important;
+  }
+</style>
+
+<div style="margin-bottom: 15px; padding: 10px; background-color: #e7f3ff; border-left: 4px solid #0066cc; border-radius: 3px;">
+  <strong>💡 Tip:</strong> Click on a node name to reserve it
+</div>
+
 <form class="form-inline" name="blazar-calendar-controls">
   <div class="form-group calendar-group">
     <button class="btn btn-sm btn-default calendar-quickdays" data-calendar-days="1">1 {% trans "day" %}</button>
