@@ -28,12 +28,13 @@
           selector.val(resp.resources.flavors[0].id).change();
           selector.prop('disabled', false);
         }
+        let reservableHosts = resp.resources.hosts.filter(host => host.reservable)
 
         function maxInstances(flavorId) {
           // Max number of this flavor across all instances
           let flavor = resp.resources.flavors.find(f => f.id === flavorId);
 
-          return resp.resources.hosts.reduce(function (accumulator, host) {
+          return reservableHosts.reduce(function (accumulator, host) {
             let totalVCPUs = host.vcpus;
             let totalMemory = host.memory_mb;
 
@@ -98,7 +99,7 @@
           if (!flavor) return [];
 
           let instanceChangeEvents = []
-          resp.resources.hosts.forEach(host => {
+          reservableHosts.forEach(host => {
             if (!passesTraits(flavor, host)) {
               // Ignore reservations on incompatible hosts
               return
