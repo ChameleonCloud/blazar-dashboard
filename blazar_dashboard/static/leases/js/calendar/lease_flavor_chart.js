@@ -28,7 +28,18 @@
           selector.val(resp.resources.flavors[0].id).change();
           selector.prop('disabled', false);
         }
-        let reservableHosts = resp.resources.hosts.filter(host => host.reservable)
+        let reservableHosts = resp.resources.hosts.filter(host => {
+          if (!host.reservable) {
+            return false;
+          }
+          if (host.authorized_projects) {
+            let projects = host.authorized_projects.split(",");
+            if (!projects.includes(resp.project_id)) {
+              return false;
+            }
+          }
+          return true;
+        });
 
         function maxInstances(flavorId) {
           // Max number of this flavor across all instances
@@ -69,7 +80,7 @@
           }, []);
         }
 
-        function passesTraits(flavor, host){
+        function passesTraits(flavor, host) {
           let ret = true;
           Object.keys(flavor["extra_specs"]).forEach(key => {
             let value = flavor["extra_specs"][key];
@@ -161,7 +172,7 @@
           let availableInstancesNumber = maxInstancesNumber
           // Data to graph. We start at max instances before first allocation.
           let timeSeries = [];
-          timeSeries.push({ x: 0, y: maxInstancesNumber })          
+          timeSeries.push({ x: 0, y: maxInstancesNumber })
           instanceChangeEvents.forEach(event => {
             availableInstancesNumber += event.changeInstance;
             timeSeries.push({
@@ -258,15 +269,15 @@
             $('#dateStart').datepicker('getDate'),
             $('#dateEnd').datepicker('getDate')
           ];
-    
+
           timeDomain[0].setHours($('#timeStartHours').val());
           timeDomain[0].setMinutes(0);
           timeDomain[1].setHours($('#timeEndHours').val());
           timeDomain[1].setMinutes(0);
-    
+
           return timeDomain;
         }
-    
+
         let form = $('form[name="blazar-calendar-controls"]');
         $('input[data-datepicker]', form).datepicker({
           dateFormat: 'mm/dd/yyyy'
