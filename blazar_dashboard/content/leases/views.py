@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 
 from blazar_dashboard import api
@@ -97,16 +98,40 @@ def calendar_data_view(request, resource_type):
 
 
 def extra_capabilities(request, resource_type):
+    extra_capabilities_function_map = {
+        "computehost": api.client.computehost_extra_capabilities,
+        "network": api.client.network_extra_capabilities,
+        "device": api.client.device_extra_capabilities
+    }
+    # Properties from the object to also fetch
+    object_properties_map = {
+        "device": ["name"],
+        "network": ["segment_id"],
+    }
+    object_list_function_map = {
+        "device": api.client.device_list,
+        "network": api.client.network_list,
+    }
+
     extra_capabilities = None
-    if resource_type == 'computehost':
-        extra_capabilities = api.client.computehost_extra_capabilities(
-            request)
-    elif resource_type == 'network':
-        extra_capabilities = api.client.network_extra_capabilities(
-            request)
-    elif resource_type == 'device':
-        extra_capabilities = api.client.device_extra_capabilities(
-            request)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        extra_capabilities_future = None
+        if resource_type in extra_capabilities_function_map:
+            extra_capabilities_future = executor.submit(extra_capabilities_function_map[resource_type], request)
+
+        objects = None
+        if resource_type in object_list_function_map:
+            objects_future = executor.submit(object_list_function_map[resource_type], request)
+            objects = objects_future.result()
+
+        if extra_capabilities_future:
+            extra_capabilities = extra_capabilities_future.result()
+            if objects:
+                for prop in object_properties_map[resource_type]:
+                    values = set()
+                    for obj in objects:
+                        values.add(obj.get(prop))
+                    extra_capabilities[prop] = list(values)
     data = {
         'extra_capabilities': extra_capabilities}
     return JsonResponse(data)
