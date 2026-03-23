@@ -360,15 +360,17 @@ class SetNetworksAction(workflows.Action):
     def clean(self):
         cleaned_data = super(SetNetworksAction, self).clean()
 
-        if not cleaned_data.get('with_network'):
-            return cleaned_data
-
-        if (not cleaned_data.get('network_name') and
-                cleaned_data.get('network_ip_count', 0) == 0):
+        if cleaned_data.get('with_network') and not cleaned_data.get('network_name'):
             raise forms.ValidationError(
                 "No network resource is reserved! "
                 "Clear \"Reserve Networks\" checkbox "
                 "if you don't need network resources.")
+
+        if cleaned_data.get('with_floatingip') and cleaned_data.get('network_ip_count', 0) == 0:
+            raise forms.ValidationError(
+                "No floating IP resource is reserved! "
+                "Clear \"Reserve Floating IPs\" checkbox "
+                "if you don't need floating IP resources.")
 
         return cleaned_data
 
