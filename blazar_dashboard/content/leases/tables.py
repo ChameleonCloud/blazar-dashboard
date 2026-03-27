@@ -121,13 +121,9 @@ class LeasesTable(tables.DataTable):
                          link="horizon:project:leases:detail",)
     user_id = tables.Column("user_id", verbose_name=_("Created by"))
     start_date = tables.Column("start_date", verbose_name=_("Start date"),
-                               filters=(filters.parse_isotime,
-                                        partial(django_filters.date,
-                                                arg='Y-m-d H:i T')),)
+                               filters=(filters.parse_isotime,))
     end_date = tables.Column("end_date", verbose_name=_("End date"),
-                             filters=(filters.parse_isotime,
-                                      partial(django_filters.date,
-                                              arg='Y-m-d H:i T')),)
+                             filters=(filters.parse_isotime,),)
     status = tables.Column("status", verbose_name=_("Status"),)
     degraded = tables.Column("degraded", verbose_name=_("Degraded"),
                              filters=(django_filters.yesno,
