@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 import logging
+import pytz
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -79,6 +81,15 @@ class CalendarView(views.APIView):
     }
 
     def get_data(self, request, context, *args, **kwargs):
+        tz = pytz.timezone(
+            self.request.session.get('django_timezone',
+                self.request.COOKIES.get('django_timezone', 'UTC'))
+            )
+        context['timezone'] = tz
+        context['offset'] = int(
+            (datetime.datetime.now(tz).utcoffset().total_seconds() / 60) * -1)
+        context['settings_href'] = reverse('horizon:settings:user:index')
+
         context["calendar_title"] = self.titles[context["resource_type"]]
         return context
 
