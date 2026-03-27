@@ -105,6 +105,13 @@
     calendarElement.addClass('loaded');
     let fixedResources = [];
 
+    var localOffsetStr = $('#cookie_offset').val();
+    var tzOffsetDiff = 0; // ms to shift chart
+    if (localOffsetStr) {
+      var userOffset = parseInt(localOffsetStr);
+      tzOffsetDiff = userOffset * -60000;
+    }
+
     const onCalendarFilterChange = function () {
       const chosenType = $('#resource-type-chooser').val();
       filteredReservations = allReservations.map(function (reservation) {
@@ -164,13 +171,18 @@
             reservation.name = reservation.id
             reservation.data = []
           }
+          var startDateshifted = new Date(new Date(reservation.start_date).getTime() + tzOffsetDiff);
+          var endDateshifted = new Date(new Date(reservation.end_date).getTime() + tzOffsetDiff);
+          // Hacky way to format the datestring properly.
+          reservation.start_date_display = startDateshifted.toISOString().slice(0, 16).replace('T', ' ')
+          reservation.end_date_display = endDateshifted.toISOString().slice(0, 16).replace('T', ' ')
           var newReservation = {
-            'start_date': new Date(reservation.start_date),
-            'end_date': new Date(reservation.end_date),
+            'start_date': startDateshifted,
+            'end_date': endDateshifted,
             'x': reservation[rowAttr],
             'y': [
-              new Date(reservation.start_date).getTime(),
-              new Date(reservation.end_date).getTime()
+              startDateshifted,
+              endDateshifted
             ],
           }
           newReservation[chooserAttr] = reservation[chooserAttr]
@@ -233,15 +245,15 @@
           },
           events: {
             updated: function (chartContext, config) {
-              $('.apexcharts-yaxis-label').css('cursor', 'pointer').off('click').on('click', function(e) {
-                  var nodeName = $(this).text();
-                  var createUrl = '../../create/?node_name=' + encodeURIComponent(nodeName);
-                  var link = document.createElement('a');
-                  link.setAttribute('href', createUrl);
-                  link.setAttribute('class', 'ajax-modal');
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
+              $('.apexcharts-yaxis-label').css('cursor', 'pointer').off('click').on('click', function (e) {
+                var nodeName = $(this).text();
+                var createUrl = '../../create/?node_name=' + encodeURIComponent(nodeName);
+                var link = document.createElement('a');
+                link.setAttribute('href', createUrl);
+                link.setAttribute('class', 'ajax-modal');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
               });
               $(`rect.apexcharts-grid-row[fill='${RESTRICTED_BACKGROUND_COLOR}']`).mouseout(function (event) {
                 $("#resource-disabled-tooltip").hide();
@@ -296,7 +308,7 @@
               <dt>${pluralResourceType}</dt>
                 <dd>${resourcesReserved}</dd>
               <dt>${gettext("Reserved")}</dt>
-                <dd>${datum.start_date} <strong>${gettext("to")}</strong> ${datum.end_date}</dd>
+                <dd>${datum.start_date_display} <strong>${gettext("to")}</strong> ${datum.end_date_display}</dd>
               ${extras_dt}
             </dl></div>`;
           }
@@ -304,7 +316,7 @@
         annotations: {
           xaxis: [
             {
-              x: new Date().getTime(),
+              x: new Date().getTime() + tzOffsetDiff,
               borderColor: '#00E396',
             }
           ]
@@ -340,9 +352,10 @@
 
     function computeTimeDomain(days) {
       var padFraction = 1 / 8; // chart default is 3 hours for 1 day
+      var shiftedNow = Date.now() + tzOffsetDiff;
       return [
-        d3.time.day.offset(Date.now(), -days * padFraction),
-        d3.time.day.offset(Date.now(), days * (1 + padFraction))
+        d3.time.day.offset(shiftedNow, -days * padFraction),
+        d3.time.day.offset(shiftedNow, days * (1 + padFraction))
       ];
     }
 
