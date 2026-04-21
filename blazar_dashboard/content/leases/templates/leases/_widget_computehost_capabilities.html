@@ -7,6 +7,7 @@
                placeholder="Enter filter like: node_type == compute_skylake, memory_mb >= 4096"
                name="criteria-{{ widget.name }}"
                value="{{ widget.value }}"
+               data-default-node-type="{{ widget.backend_defaults.node_type }}"
                autocomplete="off"
                style="margin-top: 10px; padding-right: 35px;">
         <span id="validation-icon-computehost"
@@ -38,10 +39,11 @@
     var validationMessage = document.getElementById('validation-message-computehost');
     var availableProperties = {};
 
-    // If no value but we need a default, set it
+    // If no value but we need a default, set it from backend config or fallback
     if (!input.value || input.value.trim() === '') {
-        console.log('Setting default value');
-        input.value = 'node_type == compute_skylake';
+        var defaultNodeType = input.getAttribute('data-default-node-type') || 'compute_skylake';
+        console.log('Setting default value to:', defaultNodeType);
+        input.value = 'node_type == ' + defaultNodeType;
     }
 
     // Load available properties

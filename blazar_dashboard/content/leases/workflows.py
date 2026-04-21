@@ -221,7 +221,6 @@ class SetHostsAction(workflows.Action):
         required=False,
         help_text=_('Choose properties of the resource(s) to reserve.'),
         max_length=1024,
-        initial='node_type == compute_skylake',
         widget=widgets.CapabilityWidget(
             switchable_class='create-lease-switch-on-computehost',
             resource_type='computehost')
@@ -250,6 +249,8 @@ class SetHostsAction(workflows.Action):
             # No query param, but still set the other defaults
             if 'initial' not in kwargs:
                 kwargs['initial'] = {}
+            kwargs['initial']['computehost_resource_properties'] = (
+                'node_type == ' + conf.default_compute_node_type)
             kwargs['initial']['with_computehost'] = True
             kwargs['initial']['min_hosts'] = 1
             kwargs['initial']['max_hosts'] = 1

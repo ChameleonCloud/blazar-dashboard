@@ -6,6 +6,14 @@ function capabilitiesjs(resource_type, switchable_classname) {
     		        'device': {'vendor': 'Raspberry Pi'}
     		        };
 
+    // Override computehost node_type with backend value if available
+    if (resource_type === 'computehost') {
+        var payloadElement = document.getElementById('criteria-payload-' + resource_type);
+        if (payloadElement && payloadElement.getAttribute('data-default-node-type')) {
+            defaults['computehost']['node_type'] = payloadElement.getAttribute('data-default-node-type');
+        }
+    }
+
     var capabilityNames = [];
     var capabilityValues = {};
 

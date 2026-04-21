@@ -21,3 +21,6 @@ device_reservation = (
     }))
 
 api_limit = getattr(settings, 'OPENSTACK_BLAZAR_API_LIMIT', 20)
+
+default_compute_node_type = getattr(
+    settings, 'OPENSTACK_BLAZAR_DEFAULT_COMPUTE_NODE_TYPE', 'compute_skylake')
