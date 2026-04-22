@@ -1,6 +1,7 @@
 import datetime
 import json
 
+from blazar_dashboard import conf
 from django.forms.widgets import Widget
 from django.template import loader
 from django.utils.safestring import mark_safe
@@ -51,10 +52,16 @@ class CapabilityWidget(Widget):
             except (json.JSONDecodeError, ValueError, TypeError):
                 pass
 
+        # Add backend default for computehost node_type
+        backend_defaults = {}
+        if self.resource_type == 'computehost':
+            backend_defaults['node_type'] = conf.default_compute_node_type
+
         return {'widget': {
             'name': name,
             'value': display_value,
-            'switchable_class': self.switchable_class
+            'switchable_class': self.switchable_class,
+            'backend_defaults': backend_defaults
         }}
 
     def render(self, name, value, attrs=None, renderer=None):
