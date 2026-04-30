@@ -119,18 +119,28 @@
             // Calculate delta vcpus/memory at each reservation event
             let hostEvents = []
             resp.reservations.filter(r => r.hypervisor_hostname === host.hypervisor_hostname).forEach(reservation => {
+              var vcpus = 0;
+              var memory_mb = 0;
+              if (!reservation.usage){
+                // If no usage include, then we are using the full host
+                vcpus = host.vcpus;
+                memory_mb = host.memory_mb;
+              } else {
+                vcpus = reservation.usage.vcpus;
+                memory_mb = reservation.usage.memory_mb;
+              }
               hostEvents.push(
                 {
                   time: new Date(reservation.start_date).getTime(),
-                  changeVCPUs: -reservation.usage.vcpus,
-                  changeMemory: -reservation.usage.memory_mb,
+                  changeVCPUs: -vcpus,
+                  changeMemory: -memory_mb,
                 }
               );
               hostEvents.push(
                 {
                   time: new Date(reservation.end_date).getTime(),
-                  changeVCPUs: reservation.usage.vcpus,
-                  changeMemory: reservation.usage.memory_mb
+                  changeVCPUs: vcpus,
+                  changeMemory: memory_mb
                 }
               );
             });
