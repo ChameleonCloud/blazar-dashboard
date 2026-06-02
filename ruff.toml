@@ -1,11 +1,6 @@
-[build-system]
-requires = ["pbr>=6.0.0", "setuptools>=64.0.0"]
-build-backend = "pbr.build"
-
-[tool.ruff]
 line-length = 79
 
-[tool.ruff.lint]
+[lint]
 select = [
     "E",        # pycodestyle (error)
     "F",        # pyflakes
@@ -22,7 +17,7 @@ ignore = [
     # "F401", # imported but unused
 ]
 
-[tool.ruff.lint.per-file-ignores]
+[lint.per-file-ignores]
 "blazar_dashboard/test/settings.py" = [
     # "F405", #HORIZON_CONFIG` may be undefined, or defined from star imports
 ]
