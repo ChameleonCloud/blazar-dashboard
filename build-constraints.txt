@@ -1,0 +1,6 @@
+# Pin setuptools for isolated PEP 517 build environments.
+# Legacy xstatic-* packages call pkg_resources.declare_namespace() at build time,
+# which setuptools >=80 no longer provides.
+# used in tox.ini as constraint for installation, and PIP_BUILD_CONSTRAINT so 
+# that it applies in isolated builds too
+setuptools<82.0.0
