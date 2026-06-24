@@ -22,6 +22,7 @@ from blazar_dashboard import conf
 from django.template import defaultfilters as django_filters
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy
+from django.conf import settings
 from functools import partial
 from horizon import tables
 from horizon.utils import filters
@@ -40,6 +41,10 @@ class CreateLease(tables.LinkAction):
     def __init__(self, attrs=None, **kwargs):
         kwargs['preempt'] = True
         super(CreateLease, self).__init__(attrs, **kwargs)
+
+
+class CreateVirtualLease(CreateLease):
+    url = "horizon:project:virtual_leases:create"
 
 
 class UpdateLease(tables.LinkAction):
@@ -141,11 +146,33 @@ class LeasesTable(tables.DataTable):
             pass
         if conf.network_reservation.get('enabled'):
             table_actions.insert(0, ViewNetworkReservationCalendar)
-        if conf.host_reservation.get('enabled'):
-            table_actions.insert(0, ViewHostReservationCalendar)
         if conf.device_reservation.get('enabled'):
             table_actions.insert(0, ViewDeviceReservationCalendar)
-        if conf.flavor_reservation.get('enabled'):
-            table_actions.insert(0, ViewFlavorReservationCalendar)
+        if conf.host_reservation.get('enabled') and settings.CHAMELEON_ENABLE_VMS:
+            table_actions.insert(0, ViewHostReservationCalendar)
+
+
+        row_actions = (UpdateLease, DeleteLease, )
+
+
+
+class VirtualLeasesTable(LeasesTable):
+    name = tables.Column("name", verbose_name=_("Lease name"),
+                         link="horizon:project:virtual_leases:detail",)
+    
+    class Meta(object):
+        name = "virtual_leases"
+        verbose_name = _("Virtual Leases")
+
+        table_actions = [CreateVirtualLease, DeleteLease,]
+        # if conf.flavor_reservation.get('enabled'):
+        if conf.network_reservation.get('enabled'):
+            table_actions.insert(0, ViewNetworkReservationCalendar)
+        # if conf.host_reservation.get('enabled'):
+        #     table_actions.insert(0, ViewHostReservationCalendar)
+        if conf.device_reservation.get('enabled'):
+            table_actions.insert(0, ViewDeviceReservationCalendar)
+
+        table_actions.insert(0, ViewFlavorReservationCalendar)
 
         row_actions = (UpdateLease, DeleteLease, )

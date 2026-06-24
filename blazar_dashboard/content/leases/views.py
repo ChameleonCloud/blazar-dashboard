@@ -32,6 +32,7 @@ from horizon import tabs
 from horizon import views
 from horizon import workflows
 from horizon.utils import memoized
+from django.conf import settings
 
 LOG = logging.getLogger(__name__)
 
@@ -39,14 +40,53 @@ class IndexView(tables.DataTableView):
     table_class = project_tables.LeasesTable
     template_name = 'project/leases/index.html'
 
+    def filter_leases(self, leases):
+        """Override in subclasses to filter leases."""
+        if settings.CHAMELEON_ENABLE_VMS:
+            physical_leases = []
+            for lease in leases:
+                # filter by leases that have flavor instance, or no physical host reservations
+                no_flavor = True
+                has_physical = False
+                for x in lease["reservations"]:
+                    if x["resource_type"] == "physical:host":
+                        has_physical = True
+                    if x["resource_type"] == "flavor:instance":
+                        no_flavor = False
+                if has_physical or no_flavor:
+                    physical_leases.append(lease)
+            return physical_leases
+        return leases
+
     def get_data(self):
         try:
             leases = api.client.lease_list(self.request)
+            leases = self.filter_leases(leases)
         except Exception:
             leases = []
             msg = _('Unable to retrieve lease information.')
             exceptions.handle(self.request, msg)
         return leases
+
+
+class VirtualLeasesIndexView(IndexView):
+    table_class = project_tables.VirtualLeasesTable
+
+    def filter_leases(self, leases):
+        """Filter leases by virtual reservation type."""
+        flavor_leases = []
+        for lease in leases:
+            # filter by leases that have flavor instance, or no physical host reservations
+            no_physical = True
+            has_flavor = False
+            for x in lease["reservations"]:
+                if x["resource_type"] == "physical:host":
+                    no_physical = False
+                if x["resource_type"] == "flavor:instance":
+                    has_flavor = True
+            if has_flavor or no_physical:
+                flavor_leases.append(lease)
+        return flavor_leases
 
 
 class CalendarView(views.APIView):
@@ -111,10 +151,15 @@ class DetailView(tabs.TabView):
     tab_group_class = project_tabs.LeaseDetailTabs
     template_name = 'project/leases/detail.html'
 
+class VirtualDetailView(DetailView):
+    tab_group_class = project_tabs.LeaseDetailTabs
+    # template_name = 'project/virtual_leases/detail.html'
 
 class CreateView(workflows.WorkflowView):
     workflow_class = project_workflows.CreateLease
 
+class VirtualCreateView(CreateView):
+    workflow_class = project_workflows.VirtualCreateLease
 
 class UpdateView(workflows.WorkflowView):
     workflow_class = project_workflows.UpdateLease

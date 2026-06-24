@@ -4,6 +4,7 @@ import pytz
 
 from blazar_dashboard import api
 from blazar_dashboard import conf
+from django.conf import settings
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from horizon import exceptions
@@ -490,6 +491,19 @@ class CreateLease(workflows.Workflow):
     default_steps = [SetGeneral, SetHosts, SetFlavors,
                      SetNetworks, SetDevices]
 
+    def __init__(self, request=None, context_seed=None,
+                 entry_point=None, *args, **kwargs):
+        # Hacky way to set steps based on settings.CHAMELEON_ENABLE_VMS
+        if self.__class__ is CreateLease:
+            if settings.CHAMELEON_ENABLE_VMS:
+                self.default_steps = [SetGeneral, SetHosts,
+                                      SetNetworks, SetDevices]
+            else:
+                self.default_steps = [SetGeneral, SetHosts, SetFlavors,
+                                      SetNetworks, SetDevices]
+        super(CreateLease, self).__init__(
+            request, context_seed, entry_point, *args, **kwargs)
+
     def format_status_message(self, message):
         return message % self.context.get('name')
 
@@ -624,6 +638,10 @@ class CreateLease(workflows.Workflow):
                               message='An error occurred while creating this '
                                       'lease: %s. Please try again.' % e)
 
+
+class VirtualCreateLease(CreateLease):
+    default_steps = [SetGeneral, SetFlavors,
+                     SetNetworks, SetDevices]
 
 class UpdateGeneralAction(workflows.Action):
 

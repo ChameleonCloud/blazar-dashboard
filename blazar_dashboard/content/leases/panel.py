@@ -20,3 +20,14 @@ import horizon
 class Leases(horizon.Panel):
     name = _("Leases")
     slug = "leases"
+
+# class BaremetalLeases(Leases):
+#     slug = "leases"
+
+class VirtualLeases(Leases):
+    name = _("Leases")
+    slug = "virtual_leases"
+
+    urls = 'blazar_dashboard.content.leases.flavor_res_urls'
+    def get_absolute_url(self):
+        return super().get_absolute_url()
