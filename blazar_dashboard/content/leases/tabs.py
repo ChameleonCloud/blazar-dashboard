@@ -61,7 +61,7 @@ class OverviewTab(tabs.Tab):
             exceptions.handle(request, msg, redirect=redirect)
 
         site = None
-        sites = getattr(settings, 'CHAMELEON_SITES')
+        sites = getattr(settings, 'CHAMELEON_SITES', {})
         if sites:
             site = sites.get(request.session.get('services_region'))
         return {'lease': lease, 'nodes': nodes, 'site': site,
