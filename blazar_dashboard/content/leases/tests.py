@@ -10,11 +10,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from datetime import datetime
 from unittest import mock
 
 from django.urls import reverse
-import pytz
 
 from blazar_dashboard import api
 from blazar_dashboard.test import helpers as test
@@ -40,7 +38,8 @@ class LeasesTests(test.TestCase):
 
         res = self.client.get(INDEX_URL)
 
-        lease_list.assert_called_once_with(test.IsHttpRequest())
+        lease_list.assert_called_once_with(
+            test.IsHttpRequest(), all_tenants=False, marker=None, limit=20)
         self.assertTemplateUsed(res, INDEX_TEMPLATE)
         self.assertNoMessages(res)
         self.assertContains(res, 'lease-2')
@@ -53,7 +52,8 @@ class LeasesTests(test.TestCase):
 
         res = self.client.get(INDEX_URL)
 
-        lease_list.assert_called_once_with(test.IsHttpRequest())
+        lease_list.assert_called_once_with(
+            test.IsHttpRequest(), all_tenants=False, marker=None, limit=20)
         self.assertTemplateUsed(res, INDEX_TEMPLATE)
         self.assertNoMessages(res)
         self.assertContains(res, 'No items to display')
@@ -64,14 +64,17 @@ class LeasesTests(test.TestCase):
 
         res = self.client.get(INDEX_URL)
 
-        lease_list.assert_called_once_with(test.IsHttpRequest())
+        lease_list.assert_called_once_with(
+            test.IsHttpRequest(), all_tenants=False, marker=None, limit=20)
         self.assertTemplateUsed(res, INDEX_TEMPLATE)
         self.assertMessageCount(res, error=1)
 
+    @mock.patch.object(api.client, 'nodes_in_lease')
     @mock.patch.object(api.client, 'lease_get')
-    def test_lease_detail(self, lease_get):
+    def test_lease_detail(self, lease_get, nodes_in_lease):
         lease = self.leases.get(name='lease-1')
         lease_get.return_value = lease
+        nodes_in_lease.return_value = []
 
         res = self.client.get(reverse(DETAIL_URL_BASE, args=[lease['id']]))
 
@@ -90,106 +93,74 @@ class LeasesTests(test.TestCase):
         self.assertMessageCount(error=1)
         self.assertRedirectsNoFollow(res, INDEX_URL)
 
+    @mock.patch.object(api.client, 'compute_host_available')
+    @mock.patch.object(api.client, 'lease_list')
     @mock.patch.object(api.client, 'lease_create')
-    def test_create_lease_host_reservation(self, lease_create):
-        start_date = datetime(2030, 6, 27, 18, 0, tzinfo=pytz.utc)
-        end_date = datetime(2030, 6, 30, 18, 0, tzinfo=pytz.utc)
+    def test_create_lease_host_reservation(self, lease_create, lease_list,
+                                           compute_host_available):
         new_lease = self.leases.get(name='lease-1')
+        lease_list.return_value = []
+        compute_host_available.return_value = 5
+        lease_create.return_value = new_lease
         form_data = {
             'name': 'lease-1',
-            'start_date': start_date.strftime('%Y-%m-%d %H:%M'),
-            'end_date': end_date.strftime('%Y-%m-%d %H:%M'),
-            'resource_type': 'host',
+            'start_date': '2030-06-27',
+            'start_time': '18:00',
+            'end_date': '2030-06-30',
+            'end_time': '18:00',
+            'with_computehost': True,
             'min_hosts': 1,
             'max_hosts': 1,
-            'hypervisor_properties': '[">=", "$vcpus", "2"]'
+            'criteria-computehost_resource_properties': 'vcpus >= 2',
         }
-        lease_create.return_value = new_lease
 
         res = self.client.post(CREATE_URL, form_data)
 
         lease_create.assert_called_once_with(
             test.IsHttpRequest(),
             'lease-1',
-            start_date.strftime('%Y-%m-%d %H:%M'),
-            end_date.strftime('%Y-%m-%d %H:%M'),
+            '2030-06-27 18:00',
+            '2030-06-30 18:00',
             [
                 {
                     'min': 1,
                     'max': 1,
-                    'hypervisor_properties': '[">=", "$vcpus", "2"]',
-                    'resource_properties': '',
+                    'hypervisor_properties': '',
+                    'resource_properties': '[">=","$vcpus","2"]',
                     'resource_type': 'physical:host',
                 }
             ],
             [])
         self.assertNoFormErrors(res)
-        self.assertMessageCount(success=1)
+        self.assertMessageCount(success=2)
         self.assertRedirectsNoFollow(res, INDEX_URL)
 
+    @mock.patch.object(api.client, 'compute_host_available')
+    @mock.patch.object(api.client, 'lease_list')
     @mock.patch.object(api.client, 'lease_create')
-    def test_create_lease_instance_reservation(self, lease_create):
-        start_date = datetime(2030, 6, 27, 18, 0, tzinfo=pytz.utc)
-        end_date = datetime(2030, 6, 30, 18, 0, tzinfo=pytz.utc)
-        dummy_lease = {}
+    def test_create_lease_client_error(self, lease_create, lease_list,
+                                       compute_host_available):
+        lease_list.return_value = []
+        compute_host_available.return_value = 5
+        lease_create.side_effect = self.exceptions.blazar
         form_data = {
             'name': 'lease-1',
-            'start_date': start_date.strftime('%Y-%m-%d %H:%M'),
-            'end_date': end_date.strftime('%Y-%m-%d %H:%M'),
-            'resource_type': 'instance',
-            'amount': 3,
-            'vcpus': 2,
-            'memory_mb': 4096,
-            'disk_gb': 128,
-            'affinity': False,
-            'resource_properties': '["==", "$energy", "clean"]'
-        }
-        lease_create.return_value = dummy_lease
-
-        res = self.client.post(CREATE_URL, form_data)
-
-        lease_create.assert_called_once_with(
-            test.IsHttpRequest(),
-            'lease-1',
-            start_date.strftime('%Y-%m-%d %H:%M'),
-            end_date.strftime('%Y-%m-%d %H:%M'),
-            [
-                {
-                    'resource_type': 'virtual:instance',
-                    'amount': 3,
-                    'vcpus': 2,
-                    'memory_mb': 4096,
-                    'disk_gb': 128,
-                    'affinity': 'False',
-                    'resource_properties': '["==", "$energy", "clean"]'
-                }
-            ],
-            [])
-        self.assertNoFormErrors(res)
-        self.assertMessageCount(success=1)
-        self.assertRedirectsNoFollow(res, INDEX_URL)
-
-    @mock.patch.object(api.client, 'lease_create')
-    def test_create_lease_client_error(self, lease_create):
-        start_date = datetime(2030, 6, 27, 18, 0, tzinfo=pytz.utc)
-        end_date = datetime(2030, 6, 30, 18, 0, tzinfo=pytz.utc)
-        form_data = {
-            'name': 'lease-1',
-            'start_date': start_date.strftime('%Y-%m-%d %H:%M'),
-            'end_date': end_date.strftime('%Y-%m-%d %H:%M'),
-            'resource_type': 'host',
+            'start_date': '2030-06-27',
+            'start_time': '18:00',
+            'end_date': '2030-06-30',
+            'end_time': '18:00',
+            'with_computehost': True,
             'min_hosts': 1,
             'max_hosts': 1,
         }
-        lease_create.side_effect = self.exceptions.blazar
 
         res = self.client.post(CREATE_URL, form_data)
 
         lease_create.assert_called_once_with(
             test.IsHttpRequest(),
             'lease-1',
-            start_date.strftime('%Y-%m-%d %H:%M'),
-            end_date.strftime('%Y-%m-%d %H:%M'),
+            '2030-06-27 18:00',
+            '2030-06-30 18:00',
             [
                 {
                     'min': 1,
@@ -200,18 +171,16 @@ class LeasesTests(test.TestCase):
                 }
             ],
             [])
-        self.assertTemplateUsed(res, CREATE_TEMPLATE)
-        self.assertNoFormErrors(res)
-        self.assertContains(res, 'An error occurred while creating')
+        self.assertMessageCount(error=2)
+        self.assertRedirectsNoFollow(res, INDEX_URL)
 
     @mock.patch.object(api.client, 'lease_get')
     @mock.patch.object(api.client, 'lease_update')
     def test_update_lease_name_and_date(self, lease_update, lease_get):
         lease = self.leases.get(name='lease-1')
         form_data = {
-            'lease_id': lease['id'],
             'lease_name': 'newname',
-            'end_time': '+1h'
+            'timespan-prolong_for-hours': '1',
         }
         lease_get.return_value = lease
 
@@ -222,9 +191,9 @@ class LeasesTests(test.TestCase):
         lease_update.assert_called_once_with(test.IsHttpRequest(),
                                              lease_id=lease['id'],
                                              name='newname',
-                                             prolong_for='1h')
+                                             prolong_for='60m')
         self.assertNoFormErrors(res)
-        self.assertMessageCount(success=1)
+        self.assertMessageCount(success=2)
         self.assertRedirectsNoFollow(res, INDEX_URL)
 
     @mock.patch.object(api.client, 'lease_get')
@@ -249,7 +218,7 @@ class LeasesTests(test.TestCase):
                 "id": "087bc740-6d2d-410b-9d47-c7b2b55a9d36",
                 "max": 3}])
         self.assertNoFormErrors(res)
-        self.assertMessageCount(success=1)
+        self.assertMessageCount(success=2)
         self.assertRedirectsNoFollow(res, INDEX_URL)
 
     @mock.patch.object(api.client, 'lease_get')
@@ -257,9 +226,8 @@ class LeasesTests(test.TestCase):
     def test_update_lease_error(self, lease_update, lease_get):
         lease = self.leases.get(name='lease-1')
         form_data = {
-            'lease_id': lease['id'],
             'lease_name': 'newname',
-            'end_time': '+1h'
+            'timespan-prolong_for-hours': '1',
         }
         lease_get.return_value = lease
         lease_update.side_effect = self.exceptions.blazar
@@ -271,10 +239,9 @@ class LeasesTests(test.TestCase):
         lease_update.assert_called_once_with(test.IsHttpRequest(),
                                              lease_id=lease['id'],
                                              name='newname',
-                                             prolong_for='1h')
-        self.assertTemplateUsed(UPDATE_TEMPLATE)
-        self.assertNoFormErrors(res)
-        self.assertContains(res, 'An error occurred while updating')
+                                             prolong_for='60m')
+        self.assertMessageCount(error=2)
+        self.assertRedirectsNoFollow(res, INDEX_URL)
 
     @mock.patch.object(api.client, 'lease_list')
     @mock.patch.object(api.client, 'lease_delete')
@@ -287,7 +254,8 @@ class LeasesTests(test.TestCase):
 
         res = self.client.post(INDEX_URL, form_data)
 
-        lease_list.assert_called_once_with(test.IsHttpRequest())
+        lease_list.assert_called_once_with(
+            test.IsHttpRequest(), all_tenants=False, marker=None, limit=20)
         lease_delete.assert_called_once_with(test.IsHttpRequest(), lease['id'])
         self.assertMessageCount(success=1)
         self.assertRedirectsNoFollow(res, INDEX_URL)
@@ -304,7 +272,8 @@ class LeasesTests(test.TestCase):
 
         res = self.client.post(INDEX_URL, form_data)
 
-        lease_list.assert_called_once_with(test.IsHttpRequest())
+        lease_list.assert_called_once_with(
+            test.IsHttpRequest(), all_tenants=False, marker=None, limit=20)
         lease_delete.assert_called_once_with(test.IsHttpRequest(), lease['id'])
         self.assertMessageCount(error=1)
         self.assertRedirectsNoFollow(res, INDEX_URL)
