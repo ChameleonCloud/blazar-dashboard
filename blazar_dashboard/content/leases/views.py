@@ -17,7 +17,6 @@ import pytz
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 
-
 from blazar_dashboard import api
 from blazar_dashboard import conf
 from blazar_dashboard.api import client
@@ -81,6 +80,8 @@ class CalendarView(views.APIView):
     }
 
     def get_data(self, request, context, *args, **kwargs):
+        if context["resource_type"] not in self.titles:
+            raise exceptions.NotFound
         tz = pytz.timezone(
             self.request.session.get('django_timezone',
                 self.request.COOKIES.get('django_timezone', 'UTC'))
@@ -89,7 +90,6 @@ class CalendarView(views.APIView):
         context['offset'] = int(
             (datetime.datetime.now(tz).utcoffset().total_seconds() / 60) * -1)
         context['settings_href'] = reverse('horizon:settings:user:index')
-
         context["calendar_title"] = self.titles[context["resource_type"]]
         return context
 
@@ -124,7 +124,7 @@ def extra_capabilities(request, resource_type):
         "network": api.client.network_list,
     }
 
-    extra_capabilities = None
+    extra_caps = None
     with ThreadPoolExecutor(max_workers=2) as executor:
         extra_capabilities_future = None
         if resource_type in extra_capabilities_function_map:
@@ -136,15 +136,15 @@ def extra_capabilities(request, resource_type):
             objects = objects_future.result()
 
         if extra_capabilities_future:
-            extra_capabilities = extra_capabilities_future.result()
+            extra_caps = extra_capabilities_future.result()
             if objects:
                 for prop in object_properties_map[resource_type]:
                     values = set()
                     for obj in objects:
                         values.add(obj.get(prop))
-                    extra_capabilities[prop] = list(values)
+                    extra_caps[prop] = list(values)
     data = {
-        'extra_capabilities': extra_capabilities}
+        'extra_capabilities': extra_caps}
     return JsonResponse(data)
 
 

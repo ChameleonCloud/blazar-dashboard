@@ -14,6 +14,7 @@
 #    under the License.
 import logging
 from datetime import datetime
+from functools import partial
 
 import pytz
 
@@ -22,7 +23,6 @@ from blazar_dashboard import conf
 from django.template import defaultfilters as django_filters
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy
-from functools import partial
 from horizon import tables
 from horizon.utils import filters
 
@@ -56,7 +56,6 @@ class UpdateLease(tables.LinkAction):
 
 
 class ViewHostReservationCalendar(tables.LinkAction):
-    # TODO(nicktimko) move calendar to a panel
     name = "calendar"
     verbose_name = _("Host Calendar")
     url = "calendar/host/"

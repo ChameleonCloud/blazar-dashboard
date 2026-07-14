@@ -13,8 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from blazar_dashboard.content.leases import views as leases_views
 from django.urls import re_path
+
+from blazar_dashboard.content.leases import views as leases_views
 
 LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 

@@ -10,20 +10,22 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from collections import OrderedDict
 from datetime import datetime
 from itertools import chain
+import json
+import logging
 import re
 
 from pytz import UTC
 
 from blazarclient import client as blazar_client
-from collections import OrderedDict
-from django.db import connections
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from horizon import exceptions
 from horizon.utils.memoized import memoized
-import json
-import logging
+from keystoneauth1.identity import v3
+from keystoneauth1 import session
 from openstack_dashboard.api import base
 from openstack_dashboard.api import neutron
 
@@ -134,19 +136,30 @@ class ExtraCapability(base.APIDictWrapper):
     def __init__(self, apiresource):
         super(ExtraCapability, self).__init__(apiresource)
 
+
 @memoized
 def blazarclient(request):
     try:
-        api_url = base.url_for(request, 'reservation')
+        _ = base.url_for(request, 'reservation')
     except exceptions.ServiceCatalogException:
         LOG.debug('No Reservation service is configured.')
         return None
 
-    LOG.debug('blazarclient connection created using the token "%s" and url'
-              '"%s"' % (request.user.token.id, api_url))
-    return blazar_client.Client(
-        blazar_url=api_url,
-        auth_token=request.user.token.id)
+    auth_url = settings.OPENSTACK_KEYSTONE_URL
+    project_id = request.user.project_id
+    domain_id = request.session.get('domain_context')
+    auth = v3.Token(auth_url,
+                    request.user.token.id,
+                    project_id=project_id,
+                    project_domain_id=domain_id)
+    insecure = getattr(settings, 'OPENSTACK_SSL_NO_VERIFY', False)
+    cacert = getattr(settings, 'OPENSTACK_SSL_CACERT', None)
+    # If 'insecure' is True, 'verify' is False in all cases; otherwise
+    # pass the cacert path if it is present, or True if no cacert.
+    verify = not insecure and (cacert or True)
+    sess = session.Session(auth=auth, verify=verify)
+
+    return blazar_client.Client(session=sess)
 
 
 def lease_list(
@@ -236,6 +249,7 @@ def host_allocations_list(request):
     """List allocations for all hosts."""
     allocations = blazarclient(request).host.list_allocations()
     return [Allocation(a) for a in allocations]
+
 
 def host_reallocate(request, host_id, lease_id):
     # Convert hypervisor hostname to numeric ID
@@ -406,6 +420,7 @@ def reservation_calendar(request):
         if request.user.project_id == reservation.get('project_id'):
             host_reservation["extras"] = [(PRETTY_EXTRA_LABELS.get(key, key), value)
                     for key, value in reservation.get("extras").items()]
+
         return {k: v for k, v in host_reservation.items() if v is not None}
 
     host_reservations = [
