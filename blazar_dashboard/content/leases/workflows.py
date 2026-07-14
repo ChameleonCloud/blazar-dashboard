@@ -1,6 +1,6 @@
 import datetime
 import json
-import pytz
+import zoneinfo
 
 from blazar_dashboard import api
 from blazar_dashboard import conf
@@ -103,7 +103,7 @@ class SetGeneralAction(workflows.Action):
     def get_help_text(self, extra_context=None):
         extra = {} if extra_context is None else dict(extra_context)
         try:
-            tz = pytz.timezone(
+            tz = zoneinfo.ZoneInfo(
                 self.request.session.get('django_timezone',
                                          self.request.COOKIES.get(
                                              'django_timezone', 'UTC')
@@ -126,7 +126,7 @@ class SetGeneralAction(workflows.Action):
             raise forms.ValidationError(
                 "Lease name is required!")
 
-        localtz = pytz.timezone(self.request.session.get(
+        localtz = zoneinfo.ZoneInfo(self.request.session.get(
             'django_timezone',
             self.request.COOKIES.get('django_timezone', 'UTC')))
 
@@ -162,7 +162,7 @@ class SetGeneralAction(workflows.Action):
         cleaned_data['end_date'] = end_datetime
         # end copy
 
-        if cleaned_data['start_date'] < datetime.datetime.now(tz=pytz.utc):
+        if cleaned_data['start_date'] < datetime.datetime.now(tz=datetime.timezone.utc):
             raise forms.ValidationError("Start date must be in the future")
 
         if cleaned_data['start_date'] >= cleaned_data['end_date']:
@@ -174,14 +174,13 @@ class SetGeneralAction(workflows.Action):
         """
         Ensure the date and time are in user's timezone, then convert to UTC.
         """
-        localtz = pytz.timezone(self.request.session.get(
+        localtz = zoneinfo.ZoneInfo(self.request.session.get(
             'django_timezone',
             self.request.COOKIES.get('django_timezone', 'UTC')))
         datetime_val = date_val.replace(
             hour=time_val.time().hour, minute=time_val.time().minute,
-            tzinfo=None)
-        datetime_val = localtz.localize(datetime_val)
-        return datetime_val.astimezone(pytz.utc)
+            tzinfo=localtz)
+        return datetime_val.astimezone(datetime.timezone.utc)
 
 
 class SetGeneral(workflows.Step):

@@ -14,9 +14,8 @@
 #    under the License.
 import logging
 from datetime import datetime
+from datetime import timezone
 from functools import partial
-
-import pytz
 
 from blazar_dashboard import api
 from blazar_dashboard import conf
@@ -50,7 +49,7 @@ class UpdateLease(tables.LinkAction):
 
     def allowed(self, request, lease):
         if datetime.strptime(lease.end_date, '%Y-%m-%dT%H:%M:%S.%f').\
-                replace(tzinfo=pytz.utc) > datetime.now(pytz.utc):
+                replace(tzinfo=timezone.utc) > datetime.now(timezone.utc):
             return True
         return False
 

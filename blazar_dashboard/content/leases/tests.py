@@ -10,6 +10,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from datetime import datetime
+from datetime import timezone
 from unittest import mock
 
 from django.urls import reverse

@@ -12,9 +12,9 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import logging
-import pytz
 import datetime
+import logging
+import zoneinfo
 from concurrent.futures import ThreadPoolExecutor
 
 from blazar_dashboard import api
@@ -82,7 +82,7 @@ class CalendarView(views.APIView):
     def get_data(self, request, context, *args, **kwargs):
         if context["resource_type"] not in self.titles:
             raise exceptions.NotFound
-        tz = pytz.timezone(
+        tz = zoneinfo.ZoneInfo(
             self.request.session.get('django_timezone',
                 self.request.COOKIES.get('django_timezone', 'UTC'))
             )
