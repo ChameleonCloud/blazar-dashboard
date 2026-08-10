@@ -510,7 +510,11 @@ class SetFlavors(workflows.Step):
     contributes = ("with_flavor", "flavor_amount", "flavor_id")
 
     def allowed(self, request):
-        return conf.flavor_reservation.get("enabled", False)
+        if not conf.flavor_reservation.get("enabled", False):
+            return False
+        # Once enabled, flavor reservations get their own panel and workflow,
+        # so the baremetal workflow stops offering them.
+        return isinstance(self.workflow, VirtualCreateLease)
 
 
 class CreateLease(workflows.Workflow):
@@ -668,6 +672,11 @@ class CreateLease(workflows.Workflow):
             exceptions.handle(request,
                               message='An error occurred while creating this '
                                       'lease: %s. Please try again.' % e)
+
+
+class VirtualCreateLease(CreateLease):
+    default_steps = [SetGeneral, SetFlavors, SetNetworks, SetDevices]
+    success_url = reverse_lazy('horizon:project:virtual_leases:index')
 
 
 class UpdateGeneralAction(workflows.Action):

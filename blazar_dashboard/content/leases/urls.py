@@ -19,7 +19,8 @@ from blazar_dashboard.content.leases import views as leases_views
 
 LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 
-urlpatterns = [
+# Shared with the virtual leases panel; see flavor_res_urls.py.
+calendar_urlpatterns = [
     re_path(r'^calendar/(?P<resource_type>(host|device|network))/$', leases_views.CalendarView.as_view(), name='calendar'),
     re_path(r'^calendar/flavor/$', leases_views.FlavorCalendarView.as_view(), name='flavor_calendar'),
     re_path(r'^calendar/(?P<resource_type>(host|device|network|flavor))/resources\.json$', leases_views.calendar_data_view,
@@ -31,6 +32,9 @@ urlpatterns = [
     re_path(r'flavors\.json$',
         leases_views.flavors,
         name='flavors'),
+]
+
+urlpatterns = calendar_urlpatterns + [
     re_path(r'^$', leases_views.IndexView.as_view(), name='index'),
     re_path(r'^create/$', leases_views.CreateView.as_view(), name='create'),
     re_path(LEASE_URL % '', leases_views.DetailView.as_view(),

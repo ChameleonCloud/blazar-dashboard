@@ -2,6 +2,14 @@
 
 {% block help_message %}
 <div class="alert alert-info">
-For reserving an instance of a flavor. Some flavors require reservations to be use.
+<p>
+To launch a virtual machine, you first need to reserve a flavor.
+To launch a bare metal instance, you instead should reserve a host. For the
+full difference, see
+<a href="https://blog.chameleoncloud.org/posts/bare-metal-or-kvm-which-should-you-choose-and-when/">our blog</a>.
+</p>
+<p>
+Some flavors require a reservation in order to be used.
+</p>
 </div>
 {% endblock %}
