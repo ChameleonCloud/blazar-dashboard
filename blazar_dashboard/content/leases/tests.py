@@ -357,3 +357,49 @@ class LeasesTests(test.TestCase):
         self.assertNoFormErrors(res)
         self.assertMessageCount(success=2)
         self.assertRedirectsNoFollow(res, INDEX_URL)
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    @mock.patch.object(api.client, "lease_list")
+    @mock.patch.object(api.client, "lease_create")
+    def test_create_lease_flavor_reservation_no_flavor_selected(
+        self, lease_create, lease_list
+    ):
+        lease_list.return_value = []
+        form_data = {
+            "name": "lease-1",
+            "start_date": "2030-06-27",
+            "start_time": "18:00",
+            "end_date": "2030-06-30",
+            "end_time": "18:00",
+            "with_flavor": True,
+            "flavor_amount": 2,
+        }
+
+        res = self.client.post(CREATE_URL, form_data)
+
+        lease_create.assert_not_called()
+        self.assertContains(res, "No flavor is reserved!")
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    @mock.patch.object(api.client, "lease_list")
+    @mock.patch.object(api.client, "lease_create")
+    def test_create_lease_flavor_reservation_no_amount(
+        self, lease_create, lease_list
+    ):
+        lease_list.return_value = []
+        form_data = {
+            "name": "lease-1",
+            "start_date": "2030-06-27",
+            "start_time": "18:00",
+            "end_date": "2030-06-30",
+            "end_time": "18:00",
+            "with_flavor": True,
+            "flavor_id": "flavor-uuid",
+        }
+
+        res = self.client.post(CREATE_URL, form_data)
+
+        lease_create.assert_not_called()
+        self.assertContains(
+            res, "Number of instances is required to reserve a flavor."
+        )
