@@ -315,3 +315,47 @@ class LeasesTests(test.TestCase):
             {"flavors": [{"id": "f1", "name": "m1.small", "extra_specs": {}}]},
             res.json(),
         )
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    def test_create_lease_flavor_step_renders(self):
+        res = self.client.get(CREATE_URL)
+
+        self.assertContains(res, 'name="flavor_id"')
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    @mock.patch.object(api.client, "lease_list")
+    @mock.patch.object(api.client, "lease_create")
+    def test_create_lease_flavor_reservation(self, lease_create, lease_list):
+        lease_list.return_value = []
+        lease_create.return_value = self.leases.get(name="lease-1")
+        form_data = {
+            "name": "lease-1",
+            "start_date": "2030-06-27",
+            "start_time": "18:00",
+            "end_date": "2030-06-30",
+            "end_time": "18:00",
+            "with_flavor": True,
+            "flavor_amount": 2,
+            "flavor_id": "flavor-uuid",
+        }
+
+        res = self.client.post(CREATE_URL, form_data)
+
+        lease_create.assert_called_once_with(
+            test.IsHttpRequest(),
+            "lease-1",
+            "2030-06-27 18:00",
+            "2030-06-30 18:00",
+            [
+                {
+                    "resource_type": "flavor:instance",
+                    "flavor_id": "flavor-uuid",
+                    "amount": 2,
+                    "affinity": "None",
+                }
+            ],
+            [],
+        )
+        self.assertNoFormErrors(res)
+        self.assertMessageCount(success=2)
+        self.assertRedirectsNoFollow(res, INDEX_URL)
