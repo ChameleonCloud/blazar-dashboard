@@ -15,6 +15,8 @@ from unittest import mock
 from django.urls import reverse
 
 from blazar_dashboard import api
+from blazar_dashboard import conf
+from blazar_dashboard.content.leases import workflows as project_workflows
 from blazar_dashboard.test import helpers as test
 
 import logging
@@ -28,6 +30,7 @@ CREATE_URL = reverse('horizon:project:leases:create')
 CREATE_TEMPLATE = 'project/leases/create.html'
 UPDATE_URL_BASE = 'horizon:project:leases:update'
 UPDATE_TEMPLATE = 'project/leases/update.html'
+FLAVORS_URL = reverse('horizon:project:leases:flavors')
 
 
 class LeasesTests(test.TestCase):
@@ -277,3 +280,36 @@ class LeasesTests(test.TestCase):
         lease_delete.assert_called_once_with(test.IsHttpRequest(), lease['id'])
         self.assertMessageCount(error=1)
         self.assertRedirectsNoFollow(res, INDEX_URL)
+
+    def test_flavor_step_not_shown_when_disabled(self):
+        workflow = project_workflows.CreateLease(request=self.request)
+
+        self.assertNotIn(
+            project_workflows.SetFlavors,
+            [type(step) for step in workflow.steps],
+        )
+
+    # conf binds the OPENSTACK_BLAZAR_* settings at import time, so
+    # override_settings does not reach it; patch the module attribute.
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    def test_flavor_step_shown_when_enabled(self):
+        workflow = project_workflows.CreateLease(request=self.request)
+
+        self.assertIn(
+            project_workflows.SetFlavors,
+            [type(step) for step in workflow.steps],
+        )
+
+    @mock.patch.object(api.client, "flavors")
+    def test_flavors_json(self, flavors):
+        flavors.return_value = [
+            {"id": "f1", "name": "m1.small", "extra_specs": {}}
+        ]
+
+        res = self.client.get(FLAVORS_URL)
+
+        flavors.assert_called_once_with(test.IsHttpRequest())
+        self.assertEqual(
+            {"flavors": [{"id": "f1", "name": "m1.small", "extra_specs": {}}]},
+            res.json(),
+        )
