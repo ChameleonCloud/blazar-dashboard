@@ -489,9 +489,17 @@ class SetFlavorsAction(workflows.Action):
     def clean(self):
         cleaned_data = super(SetFlavorsAction, self).clean()
 
-        if not (cleaned_data.get('with_flavor') and
-                cleaned_data.get('flavor_amount') and cleaned_data.get("flavor_id")):
-            return cleaned_data
+        with_flavor = cleaned_data.get("with_flavor")
+        if with_flavor and not cleaned_data.get("flavor_id"):
+            raise forms.ValidationError(
+                "No flavor is reserved! "
+                'Clear "Reserve Flavors" checkbox '
+                "if you don't need flavor resources."
+            )
+        if with_flavor and not cleaned_data.get("flavor_amount"):
+            raise forms.ValidationError(
+                "Number of instances is required to reserve a flavor."
+            )
 
         return cleaned_data
 
@@ -633,7 +641,7 @@ class CreateLease(workflows.Workflow):
                 })
         if (data.get('with_flavor', False) and
             conf.flavor_reservation.get('enabled', False) and
-                data['flavor_amount'] > 0):
+                (data.get('flavor_amount') or 0) > 0):
             reservations.append(
                 {
                     'resource_type': 'flavor:instance',
