@@ -55,6 +55,19 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
             **filters,
        }
 
+    def filter_leases(self, leases):
+        """Keep the leases belonging to this panel.
+
+        Baremetal panel: everything except leases that reserve only flavors.
+        Only applies once flavor reservations are enabled and the virtual
+        panel exists to hold them.
+        """
+        if not conf.flavor_reservation.get('enabled', False):
+            return leases
+        return [lease for lease in leases
+                if has_reservation(lease, 'physical:host')
+                or not has_reservation(lease, 'flavor:instance')]
+
     def get_data(self):
         try:
             leases = api.client.lease_list(
@@ -62,13 +75,35 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
                 **self.get_data_kwargs(),
             )
             limit = self.get_data_kwargs()['limit']
+            # Derived from the unfiltered page: a full page from Blazar means
+            # more leases exist, whether or not they survive filter_leases().
             self._has_more_data = len(leases) == limit
+            leases = self.filter_leases(leases)
         except Exception:
             leases = []
             self._has_more_data = False
             msg = _('Unable to retrieve lease information.')
             exceptions.handle(self.request, msg)
         return leases
+
+
+class VirtualLeasesIndexView(IndexView):
+    table_class = project_tables.VirtualLeasesTable
+
+    def filter_leases(self, leases):
+        """Keep the leases belonging to the virtual panel.
+
+        The mirror of IndexView.filter_leases: everything except leases that
+        reserve only hosts.
+        """
+        return [lease for lease in leases
+                if has_reservation(lease, 'flavor:instance')
+                or not has_reservation(lease, 'physical:host')]
+
+
+def has_reservation(lease, resource_type):
+    return any(reservation['resource_type'] == resource_type
+               for reservation in lease['reservations'])
 
 
 def add_timezone_context(request, context):
@@ -196,6 +231,10 @@ class CreateView(workflows.WorkflowView):
             initial['max_hosts'] = 1
             initial['computehost_resource_properties'] = f'node_name == {node_name}'
         return initial
+
+
+class VirtualCreateView(CreateView):
+    workflow_class = project_workflows.VirtualCreateLease
 
 
 class UpdateView(workflows.WorkflowView):
