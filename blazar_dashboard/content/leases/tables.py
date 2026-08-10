@@ -42,6 +42,10 @@ class CreateLease(tables.LinkAction):
         super(CreateLease, self).__init__(attrs, **kwargs)
 
 
+class CreateVirtualLease(CreateLease):
+    url = "horizon:project:virtual_leases:create"
+
+
 class UpdateLease(tables.LinkAction):
     name = "update"
     verbose_name = _("Update Lease")
@@ -149,6 +153,23 @@ class LeasesTable(tables.DataTable):
             table_actions.insert(0, ViewNetworkReservationCalendar)
         if conf.host_reservation.get('enabled'):
             table_actions.insert(0, ViewHostReservationCalendar)
+        if conf.device_reservation.get('enabled'):
+            table_actions.insert(0, ViewDeviceReservationCalendar)
+
+        row_actions = (UpdateLease, DeleteLease, )
+
+
+class VirtualLeasesTable(LeasesTable):
+    name = tables.Column("name", verbose_name=_("Lease name"),
+                         link="horizon:project:virtual_leases:detail",)
+
+    class Meta(object):
+        name = "virtual_leases"
+        verbose_name = _("Virtual Leases")
+        pagination_param = "marker"
+        table_actions = [CreateVirtualLease, DeleteLease, LeaseFilterAction, ]
+        if conf.network_reservation.get('enabled'):
+            table_actions.insert(0, ViewNetworkReservationCalendar)
         if conf.device_reservation.get('enabled'):
             table_actions.insert(0, ViewDeviceReservationCalendar)
         if conf.flavor_reservation.get('enabled'):
