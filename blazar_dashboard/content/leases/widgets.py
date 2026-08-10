@@ -112,20 +112,18 @@ class FlavorSelectWidget(Widget):
         self.switchable_class = kwargs.pop('switchable_class')
         super(FlavorSelectWidget, self).__init__(*args, **kwargs)
 
-    def get_context(self, value, attrs=None):
+    def get_context(self, name, value, attrs=None):
         return {'widget': {
+            'name': name,
             'value': value,
             'switchable_class': self.switchable_class
         }}
 
     def render(self, name, value, attrs=None, renderer=None):
-        context = self.get_context(value, attrs)
+        context = self.get_context(name, value, attrs)
         template = loader.get_template('project/leases/_widget_flavors.html').render(context)
         return mark_safe(template)
 
-    def value_from_datadict(self, data, files, name):
-        flavor_id = data.get("selected-flavor-id")
-        return flavor_id
 
 class TimespanWidget(Widget):
     """
