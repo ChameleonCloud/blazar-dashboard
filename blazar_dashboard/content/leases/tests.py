@@ -33,6 +33,7 @@ CREATE_TEMPLATE = 'project/leases/create.html'
 UPDATE_URL_BASE = 'horizon:project:leases:update'
 UPDATE_TEMPLATE = 'project/leases/update.html'
 FLAVORS_URL = reverse('horizon:project:leases:flavors')
+FLAVOR_CALENDAR_URL = reverse('horizon:project:leases:flavor_calendar')
 
 
 class LeasesTests(test.TestCase):
@@ -405,3 +406,8 @@ class LeasesTests(test.TestCase):
         self.assertContains(
             res, "Number of instances is required to reserve a flavor."
         )
+
+    def test_flavor_calendar_supplies_timezone_offset(self):
+        res = self.client.get(FLAVOR_CALENDAR_URL)
+
+        self.assertContains(res, 'id="cookie_offset"')

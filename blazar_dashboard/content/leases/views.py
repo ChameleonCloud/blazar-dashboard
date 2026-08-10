@@ -69,6 +69,18 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
         return leases
 
 
+def add_timezone_context(request, context):
+    """Supply the offset the calendar charts shift their timestamps by."""
+    tz = zoneinfo.ZoneInfo(
+        request.session.get('django_timezone',
+                            request.COOKIES.get('django_timezone', 'UTC')))
+    context['timezone'] = tz
+    context['offset'] = int(
+        (datetime.datetime.now(tz).utcoffset().total_seconds() / 60) * -1)
+    context['settings_href'] = reverse('horizon:settings:user:index')
+    return context
+
+
 class CalendarView(views.APIView):
     template_name = 'project/leases/calendar.html'
 
@@ -82,14 +94,7 @@ class CalendarView(views.APIView):
     def get_data(self, request, context, *args, **kwargs):
         if context["resource_type"] not in self.titles:
             raise exceptions.NotFound
-        tz = zoneinfo.ZoneInfo(
-            self.request.session.get('django_timezone',
-                self.request.COOKIES.get('django_timezone', 'UTC'))
-            )
-        context['timezone'] = tz
-        context['offset'] = int(
-            (datetime.datetime.now(tz).utcoffset().total_seconds() / 60) * -1)
-        context['settings_href'] = reverse('horizon:settings:user:index')
+        add_timezone_context(self.request, context)
         context["calendar_title"] = self.titles[context["resource_type"]]
         return context
 
@@ -98,6 +103,7 @@ class FlavorCalendarView(views.APIView):
     template_name = "project/leases/calendar_flavor.html"
 
     def get_data(self, request, context, *args, **kwargs):
+        add_timezone_context(self.request, context)
         context["calendar_title"] = _("Flavor Calendar")
         return context
 
