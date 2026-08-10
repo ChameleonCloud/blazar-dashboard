@@ -18,6 +18,13 @@
 
     $.getJSON("resources.json")
       .done(function (resp) {
+        var localOffsetStr = $('#cookie_offset').val();
+        var tzOffsetDiff = 0; // ms to shift chart
+        if (localOffsetStr) {
+          var userOffset = parseInt(localOffsetStr);
+          tzOffsetDiff = userOffset * -60000;
+        }
+
         // Populator the flavor selection dropdown
         let selector = $("#resource-type-chooser");
         selector.empty();
@@ -131,14 +138,14 @@
               }
               hostEvents.push(
                 {
-                  time: new Date(reservation.start_date).getTime(),
+                  time: new Date(reservation.start_date).getTime() + tzOffsetDiff,
                   changeVCPUs: -vcpus,
                   changeMemory: -memory_mb,
                 }
               );
               hostEvents.push(
                 {
-                  time: new Date(reservation.end_date).getTime(),
+                  time: new Date(reservation.end_date).getTime() + tzOffsetDiff,
                   changeVCPUs: vcpus,
                   changeMemory: memory_mb
                 }
@@ -255,9 +262,10 @@
 
         function computeTimeDomain(days) {
           var padFraction = 1 / 8;
+          var shiftedNow = Date.now() + tzOffsetDiff;
           return [
-            d3.time.day.offset(Date.now(), -days * padFraction),
-            d3.time.day.offset(Date.now(), days * (1 + padFraction))
+            d3.time.day.offset(shiftedNow, -days * padFraction),
+            d3.time.day.offset(shiftedNow, days * (1 + padFraction))
           ];
         }
         function setTimeDomain(timeDomain) {
