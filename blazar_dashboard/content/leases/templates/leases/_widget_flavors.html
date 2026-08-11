@@ -41,7 +41,6 @@
 var cri_div = document.querySelector('#select-flavor');
 var crbody = document.querySelector('#select-flavor-table tbody');
 var cr_input = document.querySelector("#select-payload-flavor")
-console.log(cr_input)
 if (cri_div.dataset.loaded_once === undefined) {
     // initial load of names
     var xhr = new XMLHttpRequest();
@@ -90,7 +89,6 @@ if (cri_div.dataset.loaded_once === undefined) {
                     row.classList.add('selected');
 
                     cr_input.value = flavor.id
-                    console.log(cr_input.value)
                 });
                 selectButton.classList.add("btn", "create-lease-switch-on-flavor")
                 actionCell.appendChild(selectButton);
@@ -107,7 +105,5 @@ if (cri_div.dataset.loaded_once === undefined) {
     xhr.send();
 
 	cri_div.dataset.loaded_once = true;
-} else {
-	console.log('blocked reload of widget code :/');
 }
 </script>
