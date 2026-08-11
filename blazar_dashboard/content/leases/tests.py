@@ -32,6 +32,10 @@ UPDATE_URL_BASE = 'horizon:project:leases:update'
 UPDATE_TEMPLATE = 'project/leases/update.html'
 FLAVORS_URL = reverse('horizon:project:leases:flavors')
 FLAVOR_CALENDAR_URL = reverse('horizon:project:leases:flavor_calendar')
+FLAVOR_CALENDAR_DATA_URL = reverse('horizon:project:leases:calendar_data',
+                                   args=['flavor'])
+HOST_CALENDAR_DATA_URL = reverse('horizon:project:leases:calendar_data',
+                                 args=['host'])
 
 
 class LeasesTests(test.TestCase):
@@ -301,6 +305,7 @@ class LeasesTests(test.TestCase):
             [type(step) for step in workflow.steps],
         )
 
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
     @mock.patch.object(api.client, "flavors")
     def test_flavors_json(self, flavors):
         flavors.return_value = [
@@ -405,7 +410,23 @@ class LeasesTests(test.TestCase):
             res, "Number of instances is required to reserve a flavor."
         )
 
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
     def test_flavor_calendar_supplies_timezone_offset(self):
         res = self.client.get(FLAVOR_CALENDAR_URL)
 
         self.assertContains(res, 'id="cookie_offset"')
+
+    def test_flavor_endpoints_absent_when_disabled(self):
+        for url in (FLAVORS_URL, FLAVOR_CALENDAR_URL,
+                    FLAVOR_CALENDAR_DATA_URL):
+            self.assertEqual(404, self.client.get(url).status_code, url)
+
+    @mock.patch.object(api.client, "reservation_calendar")
+    def test_host_calendar_data_unaffected_when_flavor_disabled(
+        self, reservation_calendar
+    ):
+        reservation_calendar.return_value = ([], [])
+
+        res = self.client.get(HOST_CALENDAR_DATA_URL)
+
+        self.assertEqual(200, res.status_code)
