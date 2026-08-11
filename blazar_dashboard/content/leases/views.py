@@ -27,7 +27,6 @@ from blazar_dashboard.content.leases import workflows as project_workflows
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import RedirectView
 from horizon import exceptions
@@ -146,6 +145,10 @@ def extra_capabilities(request, resource_type):
     data = {
         'extra_capabilities': extra_capabilities}
     return JsonResponse(data)
+
+
+def flavors(request):
+    return JsonResponse({'flavors': api.client.flavors(request)})
 
 
 class DetailView(tabs.TabView):

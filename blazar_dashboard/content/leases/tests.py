@@ -15,6 +15,8 @@ from unittest import mock
 from django.urls import reverse
 
 from blazar_dashboard import api
+from blazar_dashboard import conf
+from blazar_dashboard.content.leases import workflows as project_workflows
 from blazar_dashboard.test import helpers as test
 
 import logging
@@ -28,6 +30,7 @@ CREATE_URL = reverse('horizon:project:leases:create')
 CREATE_TEMPLATE = 'project/leases/create.html'
 UPDATE_URL_BASE = 'horizon:project:leases:update'
 UPDATE_TEMPLATE = 'project/leases/update.html'
+FLAVORS_URL = reverse('horizon:project:leases:flavors')
 
 
 class LeasesTests(test.TestCase):
@@ -277,3 +280,126 @@ class LeasesTests(test.TestCase):
         lease_delete.assert_called_once_with(test.IsHttpRequest(), lease['id'])
         self.assertMessageCount(error=1)
         self.assertRedirectsNoFollow(res, INDEX_URL)
+
+    def test_flavor_step_not_shown_when_disabled(self):
+        workflow = project_workflows.CreateLease(request=self.request)
+
+        self.assertNotIn(
+            project_workflows.SetFlavors,
+            [type(step) for step in workflow.steps],
+        )
+
+    # conf binds the OPENSTACK_BLAZAR_* settings at import time, so
+    # override_settings does not reach it; patch the module attribute.
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    def test_flavor_step_shown_when_enabled(self):
+        workflow = project_workflows.CreateLease(request=self.request)
+
+        self.assertIn(
+            project_workflows.SetFlavors,
+            [type(step) for step in workflow.steps],
+        )
+
+    @mock.patch.object(api.client, "flavors")
+    def test_flavors_json(self, flavors):
+        flavors.return_value = [
+            {"id": "f1", "name": "m1.small", "extra_specs": {}}
+        ]
+
+        res = self.client.get(FLAVORS_URL)
+
+        flavors.assert_called_once_with(test.IsHttpRequest())
+        self.assertEqual(
+            {"flavors": [{"id": "f1", "name": "m1.small", "extra_specs": {}}]},
+            res.json(),
+        )
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    def test_create_lease_flavor_step_renders(self):
+        res = self.client.get(CREATE_URL)
+
+        self.assertContains(res, 'name="flavor_id"')
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    @mock.patch.object(api.client, "lease_list")
+    @mock.patch.object(api.client, "lease_create")
+    def test_create_lease_flavor_reservation(self, lease_create, lease_list):
+        lease_list.return_value = []
+        lease_create.return_value = self.leases.get(name="lease-1")
+        form_data = {
+            "name": "lease-1",
+            "start_date": "2030-06-27",
+            "start_time": "18:00",
+            "end_date": "2030-06-30",
+            "end_time": "18:00",
+            "with_flavor": True,
+            "flavor_amount": 2,
+            "flavor_id": "flavor-uuid",
+        }
+
+        res = self.client.post(CREATE_URL, form_data)
+
+        lease_create.assert_called_once_with(
+            test.IsHttpRequest(),
+            "lease-1",
+            "2030-06-27 18:00",
+            "2030-06-30 18:00",
+            [
+                {
+                    "resource_type": "flavor:instance",
+                    "flavor_id": "flavor-uuid",
+                    "amount": 2,
+                    "affinity": "None",
+                }
+            ],
+            [],
+        )
+        self.assertNoFormErrors(res)
+        self.assertMessageCount(success=2)
+        self.assertRedirectsNoFollow(res, INDEX_URL)
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    @mock.patch.object(api.client, "lease_list")
+    @mock.patch.object(api.client, "lease_create")
+    def test_create_lease_flavor_reservation_no_flavor_selected(
+        self, lease_create, lease_list
+    ):
+        lease_list.return_value = []
+        form_data = {
+            "name": "lease-1",
+            "start_date": "2030-06-27",
+            "start_time": "18:00",
+            "end_date": "2030-06-30",
+            "end_time": "18:00",
+            "with_flavor": True,
+            "flavor_amount": 2,
+        }
+
+        res = self.client.post(CREATE_URL, form_data)
+
+        lease_create.assert_not_called()
+        self.assertContains(res, "No flavor is reserved!")
+
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
+    @mock.patch.object(api.client, "lease_list")
+    @mock.patch.object(api.client, "lease_create")
+    def test_create_lease_flavor_reservation_no_amount(
+        self, lease_create, lease_list
+    ):
+        lease_list.return_value = []
+        form_data = {
+            "name": "lease-1",
+            "start_date": "2030-06-27",
+            "start_time": "18:00",
+            "end_date": "2030-06-30",
+            "end_time": "18:00",
+            "with_flavor": True,
+            "flavor_id": "flavor-uuid",
+        }
+
+        res = self.client.post(CREATE_URL, form_data)
+
+        lease_create.assert_not_called()
+        self.assertContains(
+            res, "Number of instances is required to reserve a flavor."
+        )

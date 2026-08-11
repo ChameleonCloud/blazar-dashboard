@@ -1,0 +1,113 @@
+<style>
+    #select-flavor table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    #select-flavor th, #select-flavor  td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    #select-flavor th {
+      background-color: #f2f2f2;
+    }
+    #select-flavor .selected {
+      background-color: #d3f4ff;
+    }
+</style>
+
+<div id="select-flavor" style="margin-bottom:50px" data-switchable-class="{{ widget.switchable_class }}">
+    <input id="select-payload-flavor" name="{{ widget.name }}" type="hidden">
+    <div>
+        <table id="select-flavor-table" class="form-inline" style="padding-inline-start:0px;">
+            <thead>
+                <th>Name</th>
+                <th>Description</th>
+                <th>VCPU</th>
+                <th>RAM</th>
+                <th>Disk</th>
+                <th>VGPU</th>
+                <th></th>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+var cri_div = document.querySelector('#select-flavor');
+var crbody = document.querySelector('#select-flavor-table tbody');
+var cr_input = document.querySelector("#select-payload-flavor")
+console.log(cr_input)
+if (cri_div.dataset.loaded_once === undefined) {
+    // initial load of names
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            let flavorValues = JSON.parse(this.responseText)['flavors'];
+            flavorValues.filter(
+                // Filter out flavors with blazar extra spec set
+                flavor => !Object.keys(flavor.extra_specs).some(
+                    es => es.startsWith("resources:CUSTOM_RESERVATION_")
+                )
+            ).forEach(flavor => {
+                const row = document.createElement('tr');
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = flavor.name;
+                row.appendChild(nameCell);
+
+                const descriptionCell = document.createElement('td');
+                descriptionCell.textContent = flavor.description || '';
+                row.appendChild(descriptionCell);
+
+                const cpuCell = document.createElement('td');
+                cpuCell.textContent = flavor.vcpus;
+                row.appendChild(cpuCell);
+
+                const ramCell = document.createElement('td');
+                ramCell.textContent = flavor.ram;
+                row.appendChild(ramCell);
+
+                const diskCell = document.createElement('td');
+                diskCell.textContent = flavor.disk;
+                row.appendChild(diskCell);
+
+                const gpuCell = document.createElement('td');
+                gpuCell.textContent = flavor["extra_specs"]["resources:VGPU"] || "";
+                row.appendChild(gpuCell);
+
+                const actionCell = document.createElement('td');
+                const selectButton = document.createElement('button');
+                selectButton.type = 'button'; 
+                selectButton.textContent = 'Select';
+                selectButton.addEventListener('click', () => {
+                    const rows = crbody.querySelectorAll('tr');
+                    rows.forEach(r => r.classList.remove('selected'));
+                    row.classList.add('selected');
+
+                    cr_input.value = flavor.id
+                    console.log(cr_input.value)
+                });
+                selectButton.classList.add("btn", "create-lease-switch-on-flavor")
+                actionCell.appendChild(selectButton);
+                row.appendChild(actionCell);
+
+                crbody.appendChild(row);
+            })
+        }
+        
+        var capability_loaded = new Event('flavors_loaded');
+        document.dispatchEvent(capability_loaded);
+    };
+    xhr.open('GET', 'flavors.json', true);
+    xhr.send();
+
+	cri_div.dataset.loaded_once = true;
+} else {
+	console.log('blocked reload of widget code :/');
+}
+</script>

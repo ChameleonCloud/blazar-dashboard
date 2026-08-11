@@ -20,6 +20,11 @@ device_reservation = (
         'enabled': False,
     }))
 
+flavor_reservation = (
+    getattr(settings, 'OPENSTACK_BLAZAR_FLAVOR_RESERVATION', {
+        'enabled': False,
+    }))
+
 api_limit = getattr(settings, 'OPENSTACK_BLAZAR_API_LIMIT', 20)
 
 default_compute_node_type = getattr(

@@ -107,6 +107,24 @@ class CapabilityWidget(Widget):
         return resource_properties
 
 
+class FlavorSelectWidget(Widget):
+    def __init__(self, *args, **kwargs):
+        self.switchable_class = kwargs.pop('switchable_class')
+        super(FlavorSelectWidget, self).__init__(*args, **kwargs)
+
+    def get_context(self, name, value, attrs=None):
+        return {'widget': {
+            'name': name,
+            'value': value,
+            'switchable_class': self.switchable_class
+        }}
+
+    def render(self, name, value, attrs=None, renderer=None):
+        context = self.get_context(name, value, attrs)
+        template = loader.get_template('project/leases/_widget_flavors.html').render(context)
+        return mark_safe(template)
+
+
 class TimespanWidget(Widget):
     """
     Produces 4 text boxes for days/hours/minutes/seconds. Converts data into
