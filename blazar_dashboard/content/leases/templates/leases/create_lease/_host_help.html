@@ -2,8 +2,16 @@
 
 {% block help_message %}
 <div class="alert alert-info">
+<p>
+To launch a bare metal instance, you first need to reserve a host.
+To launch a virtual machine, you instead should reserve a flavor. For the
+full difference, see
+<a href="https://blog.chameleoncloud.org/posts/bare-metal-or-kvm-which-should-you-choose-and-when/">our blog</a>.
+</p>
+<p>
 For specific node reservations, you can find the node UUID using
 <a href="https://www.chameleoncloud.org/user/discovery">Resource Discovery</a>
 on the user portal.
+</p>
 </div>
 {% endblock %}

@@ -20,3 +20,9 @@ import horizon
 class Leases(horizon.Panel):
     name = _("Leases")
     slug = "leases"
+
+
+class VirtualLeases(Leases):
+    name = _("Virtual Leases")
+    slug = "virtual_leases"
+    urls = 'blazar_dashboard.content.leases.flavor_res_urls'

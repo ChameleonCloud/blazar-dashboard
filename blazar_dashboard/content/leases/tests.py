@@ -32,6 +32,8 @@ UPDATE_URL_BASE = 'horizon:project:leases:update'
 UPDATE_TEMPLATE = 'project/leases/update.html'
 FLAVORS_URL = reverse('horizon:project:leases:flavors')
 FLAVOR_CALENDAR_URL = reverse('horizon:project:leases:flavor_calendar')
+VIRTUAL_INDEX_URL = reverse('horizon:project:virtual_leases:index')
+VIRTUAL_CREATE_URL = reverse('horizon:project:virtual_leases:create')
 
 
 class LeasesTests(test.TestCase):
@@ -282,24 +284,31 @@ class LeasesTests(test.TestCase):
         self.assertMessageCount(error=1)
         self.assertRedirectsNoFollow(res, INDEX_URL)
 
+    # conf binds the OPENSTACK_BLAZAR_* settings at import time, so
+    # override_settings does not reach it; patch the module attribute.
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": False})
     def test_flavor_step_not_shown_when_disabled(self):
-        workflow = project_workflows.CreateLease(request=self.request)
+        workflow = project_workflows.VirtualCreateLease(request=self.request)
 
         self.assertNotIn(
             project_workflows.SetFlavors,
             [type(step) for step in workflow.steps],
         )
 
-    # conf binds the OPENSTACK_BLAZAR_* settings at import time, so
-    # override_settings does not reach it; patch the module attribute.
-    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
     def test_flavor_step_shown_when_enabled(self):
-        workflow = project_workflows.CreateLease(request=self.request)
+        workflow = project_workflows.VirtualCreateLease(request=self.request)
 
         self.assertIn(
             project_workflows.SetFlavors,
             [type(step) for step in workflow.steps],
         )
+
+    def test_flavor_step_not_on_baremetal_workflow(self):
+        workflow = project_workflows.CreateLease(request=self.request)
+
+        step_classes = [type(step) for step in workflow.steps]
+        self.assertNotIn(project_workflows.SetFlavors, step_classes)
+        self.assertIn(project_workflows.SetHosts, step_classes)
 
     @mock.patch.object(api.client, "flavors")
     def test_flavors_json(self, flavors):
@@ -315,13 +324,11 @@ class LeasesTests(test.TestCase):
             res.json(),
         )
 
-    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
     def test_create_lease_flavor_step_renders(self):
-        res = self.client.get(CREATE_URL)
+        res = self.client.get(VIRTUAL_CREATE_URL)
 
         self.assertContains(res, 'name="flavor_id"')
 
-    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
     @mock.patch.object(api.client, "lease_list")
     @mock.patch.object(api.client, "lease_create")
     def test_create_lease_flavor_reservation(self, lease_create, lease_list):
@@ -338,7 +345,7 @@ class LeasesTests(test.TestCase):
             "flavor_id": "flavor-uuid",
         }
 
-        res = self.client.post(CREATE_URL, form_data)
+        res = self.client.post(VIRTUAL_CREATE_URL, form_data)
 
         lease_create.assert_called_once_with(
             test.IsHttpRequest(),
@@ -357,9 +364,8 @@ class LeasesTests(test.TestCase):
         )
         self.assertNoFormErrors(res)
         self.assertMessageCount(success=2)
-        self.assertRedirectsNoFollow(res, INDEX_URL)
+        self.assertRedirectsNoFollow(res, VIRTUAL_INDEX_URL)
 
-    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
     @mock.patch.object(api.client, "lease_list")
     @mock.patch.object(api.client, "lease_create")
     def test_create_lease_flavor_reservation_no_flavor_selected(
@@ -376,12 +382,11 @@ class LeasesTests(test.TestCase):
             "flavor_amount": 2,
         }
 
-        res = self.client.post(CREATE_URL, form_data)
+        res = self.client.post(VIRTUAL_CREATE_URL, form_data)
 
         lease_create.assert_not_called()
         self.assertContains(res, "No flavor is reserved!")
 
-    @mock.patch.object(conf, "flavor_reservation", {"enabled": True})
     @mock.patch.object(api.client, "lease_list")
     @mock.patch.object(api.client, "lease_create")
     def test_create_lease_flavor_reservation_no_amount(
@@ -398,7 +403,7 @@ class LeasesTests(test.TestCase):
             "flavor_id": "flavor-uuid",
         }
 
-        res = self.client.post(CREATE_URL, form_data)
+        res = self.client.post(VIRTUAL_CREATE_URL, form_data)
 
         lease_create.assert_not_called()
         self.assertContains(
@@ -409,3 +414,53 @@ class LeasesTests(test.TestCase):
         res = self.client.get(FLAVOR_CALENDAR_URL)
 
         self.assertContains(res, 'id="cookie_offset"')
+
+    def _lease_reserving(self, name, *resource_types):
+        lease = dict(self.leases.get(name='lease-1').to_dict())
+        lease['id'] = name
+        lease['name'] = name
+        lease['reservations'] = [{'resource_type': rt} for rt in resource_types]
+        return api.client.Lease(lease)
+
+    @mock.patch.object(api.client, 'lease_list')
+    def test_index_excludes_flavor_only_leases(self, lease_list):
+        lease_list.return_value = [
+            self._lease_reserving('host-lease', 'physical:host'),
+            self._lease_reserving('flavor-lease', 'flavor:instance'),
+            self._lease_reserving('both-lease',
+                                  'physical:host', 'flavor:instance'),
+        ]
+
+        res = self.client.get(INDEX_URL)
+
+        self.assertContains(res, 'host-lease')
+        self.assertContains(res, 'both-lease')
+        self.assertNotContains(res, 'flavor-lease')
+
+    @mock.patch.object(api.client, 'lease_list')
+    def test_virtual_index_excludes_host_only_leases(self, lease_list):
+        lease_list.return_value = [
+            self._lease_reserving('host-lease', 'physical:host'),
+            self._lease_reserving('flavor-lease', 'flavor:instance'),
+            self._lease_reserving('both-lease',
+                                  'physical:host', 'flavor:instance'),
+        ]
+
+        res = self.client.get(VIRTUAL_INDEX_URL)
+
+        self.assertContains(res, 'flavor-lease')
+        self.assertContains(res, 'both-lease')
+        self.assertNotContains(res, 'host-lease')
+
+    @mock.patch.object(conf, 'flavor_reservation', {'enabled': False})
+    @mock.patch.object(api.client, 'lease_list')
+    def test_index_unfiltered_when_disabled(self, lease_list):
+        lease_list.return_value = [
+            self._lease_reserving('host-lease', 'physical:host'),
+            self._lease_reserving('flavor-lease', 'flavor:instance'),
+        ]
+
+        res = self.client.get(INDEX_URL)
+
+        self.assertContains(res, 'host-lease')
+        self.assertContains(res, 'flavor-lease')
