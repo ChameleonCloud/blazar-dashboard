@@ -472,7 +472,7 @@ class SetFlavorsAction(workflows.Action):
         })
     )
     flavor_id = forms.CharField(
-        label=_("Resource Properties"),
+        label=_("Flavor"),
         required=False,
         help_text=_('Choose flavor to reserve.'),
         max_length=1024,
