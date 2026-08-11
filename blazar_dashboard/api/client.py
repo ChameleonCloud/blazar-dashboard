@@ -10,6 +10,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import asyncio
 from datetime import datetime
 from itertools import chain
 import re
@@ -26,6 +27,7 @@ import logging
 from openstack_dashboard.api import base
 from openstack_dashboard.api import neutron
 from openstack_dashboard.api import _nova
+from openstack_dashboard.api import placement
 
 
 LOG = logging.getLogger(__name__)
@@ -349,6 +351,10 @@ def compute_host_display_name(host):
     return getattr(host, 'node_name', 'node{}'.format(host.id))
 
 
+def compute_host_display_type(host):
+    return getattr(host, 'node_type', 'unknown')
+
+
 def nodes_in_lease(request, lease):
     """Return list of hypervisor_hostnames in a lease."""
     if not any(
@@ -382,7 +388,7 @@ def reservation_calendar(request):
         host_dict = dict(
             hypervisor_hostname=h.hypervisor_hostname, vcpus=h.vcpus,
             memory_mb=h.memory_mb, local_gb=h.local_gb, cpu_info=h.cpu_info,
-            hypervisor_type=h.hypervisor_type, node_type=h.node_type,
+            hypervisor_type=h.hypervisor_type, node_type=compute_host_display_type(h),
             node_name=compute_host_display_name(h), reservable=h.reservable)
         # Copy these keys if they exist
         for key in ["authorized_projects", "restricted_reason"]:
@@ -401,6 +407,7 @@ def reservation_calendar(request):
             id=reservation['id'],
             status=reservation.get('status'),
             hypervisor_hostname=hosts_by_id[resource_id].hypervisor_hostname,
+            usage=reservation.get("usage"),
             node_name=compute_host_display_name(hosts_by_id[resource_id]))
         # Only include "extras" for reservations in the current project
         if request.user.project_id == reservation.get('project_id'):
@@ -418,6 +425,54 @@ def reservation_calendar(request):
 
     return compute_hosts, list(chain(*host_reservations))
 
+
+def flavor_reservation_calendar(request):
+    hosts, reservations = reservation_calendar(request)
+
+    async def fetch_async_data():
+        async def fetch_resource_providers():
+            try:
+                return placement.resource_providers(request)
+            except Exception as e:
+                # If there is an issue with placment API, ignore it
+                return []
+
+        async def fetch_flavors():
+            # Filter flavors to exclude reserved flavors
+            return [
+                f for f in flavors(request)
+                if not any(
+                    k.startswith("resources:CUSTOM_RESERVATION_")
+                    for k in f["extra_specs"].keys()
+                )
+            ]
+
+        async def fetch_traits(rp):
+            try:
+                rp["traits"] = placement.resource_provider_traits(
+                    request, rp["uuid"])
+            except Exception as e:
+                # If there is an issue with placment API, ignore it
+                return []
+
+        flavors_task = fetch_flavors()
+        rps = await fetch_resource_providers()
+        host_tasks = [fetch_traits(rp) for rp in rps]
+        *_, flavor_result = await asyncio.gather(*host_tasks, flavors_task)
+        return rps, flavor_result
+
+    # Fetch flavors and host traits. Hosts list is updated in place
+    resource_providers, f = asyncio.run(fetch_async_data())
+    rp_by_name = {
+        rp["name"]: rp for rp in resource_providers
+    }
+    for host in hosts:
+        host["traits"] = rp_by_name.get(
+            host["hypervisor_hostname"], {}).get("traits")
+    return {
+        "hosts": hosts,
+        "flavors": f,
+    }, reservations
 
 def network_reservation_calendar(request):
     """Return a list of all scheduled network leases."""
