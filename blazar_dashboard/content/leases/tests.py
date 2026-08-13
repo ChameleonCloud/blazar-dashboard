@@ -421,6 +421,9 @@ class LeasesTests(test.TestCase):
 
         self.assertContains(res, 'id="cookie_offset"')
 
+    # The suite now enables flavor reservation by default, so this one has to
+    # ask for the disabled state explicitly.
+    @mock.patch.object(conf, "flavor_reservation", {"enabled": False})
     def test_flavor_endpoints_absent_when_disabled(self):
         for url in (FLAVORS_URL, FLAVOR_CALENDAR_URL,
                     FLAVOR_CALENDAR_DATA_URL):
