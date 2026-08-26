@@ -42,6 +42,7 @@ class CreateLease(tables.LinkAction):
 
 
 class CreateVirtualLease(CreateLease):
+    verbose_name = _("Create Virtual Lease")
     url = "horizon:project:virtual_leases:create"
 
 

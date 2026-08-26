@@ -463,6 +463,23 @@ class LeasesTests(test.TestCase):
         self.assertNotContains(res, 'flavor-lease')
 
     @mock.patch.object(api.client, 'lease_list')
+    def test_index_pages_are_distinguishable(self, lease_list):
+        """The two panels show disjoint lease sets, so they must not share a
+        page header -- otherwise an empty table on the wrong panel is
+        indistinguishable from a lease that failed to create.
+        """
+        lease_list.return_value = []
+
+        baremetal = self.client.get(INDEX_URL)
+        virtual = self.client.get(VIRTUAL_INDEX_URL)
+
+        # The sidebar links to both panels from either page, so assert on the
+        # <h1> and <title> rather than anywhere in the response body.
+        self.assertContains(baremetal, '<h1>Leases</h1>', html=False)
+        self.assertContains(virtual, '<h1>Virtual Leases</h1>', html=False)
+        self.assertNotContains(virtual, '<h1>Leases</h1>', html=False)
+
+    @mock.patch.object(api.client, 'lease_list')
     def test_virtual_index_excludes_host_only_leases(self, lease_list):
         lease_list.return_value = [
             self._lease_reserving('host-lease', 'physical:host'),

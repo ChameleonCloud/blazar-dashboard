@@ -98,6 +98,10 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
 
 class VirtualLeasesIndexView(IndexView):
     table_class = project_tables.VirtualLeasesTable
+    # Without its own template this renders index.html, whose title and
+    # page header are the hardcoded string "Leases" -- identical to the
+    # baremetal panel, which shows a disjoint set of leases.
+    template_name = 'project/leases/virtual_index.html'
 
     def filter_leases(self, leases):
         """Keep the leases belonging to the virtual panel.
