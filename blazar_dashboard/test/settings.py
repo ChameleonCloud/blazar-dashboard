@@ -17,7 +17,7 @@ from openstack_dashboard.test.settings import *  # noqa: F403,H303
 # Exercise the split lease UI by default; the tests that need the unsplit
 # behaviour patch conf.flavor_reservation instead. This has to be set before
 # blazar_dashboard.enabled is imported, because conf reads it at import time
-# and _92_project_virtual_leases_panel registers on it.
+# and _1027_chameleon_project_virtual_leases_panel registers on it.
 OPENSTACK_BLAZAR_FLAVOR_RESERVATION = {'enabled': True}
 
 # Update the dashboards with blazar_dashboard
