@@ -58,6 +58,10 @@ class UpdateLease(tables.LinkAction):
         return False
 
 
+class UpdateVirtualLease(UpdateLease):
+    url = "horizon:project:virtual_leases:update"
+
+
 class ViewHostReservationCalendar(tables.LinkAction):
     name = "calendar"
     verbose_name = _("Host Calendar")
@@ -173,4 +177,4 @@ class VirtualLeasesTable(LeasesTable):
         if conf.flavor_reservation.get('enabled'):
             table_actions.insert(0, ViewFlavorReservationCalendar)
 
-        row_actions = (UpdateLease, DeleteLease, )
+        row_actions = (UpdateVirtualLease, DeleteLease, )

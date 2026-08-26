@@ -15,7 +15,7 @@ from blazar_dashboard import conf
 # The slug of the panel to be added to HORIZON_CONFIG. Required.
 PANEL = 'virtual_leases'
 # The slug of the panel group the PANEL is associated with.
-PANEL_GROUP = 'reservations'
+PANEL_GROUP = 'virtual_compute'
 # The slug of the dashboard the PANEL associated with. Required.
 PANEL_DASHBOARD = 'project'
 

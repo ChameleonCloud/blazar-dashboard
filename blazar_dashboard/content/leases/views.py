@@ -23,6 +23,7 @@ from blazar_dashboard.api import client
 from blazar_dashboard.content.leases import tables as project_tables
 from blazar_dashboard.content.leases import tabs as project_tabs
 from blazar_dashboard.content.leases import workflows as project_workflows
+from django.http import Http404
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -37,6 +38,16 @@ from horizon import workflows
 from horizon.utils import memoized
 
 LOG = logging.getLogger(__name__)
+
+
+def _require_flavor_reservation():
+    """404 the flavor endpoints on sites that do not offer flavor reservations.
+
+    The routes are registered unconditionally so that reverse() works
+    everywhere, so the feature check has to happen per request.
+    """
+    if not conf.flavor_reservation.get('enabled', False):
+        raise Http404
 
 class IndexView(tables.PagedTableMixin, tables.DataTableView):
     table_class = project_tables.LeasesTable
@@ -138,12 +149,15 @@ class FlavorCalendarView(views.APIView):
     template_name = "project/leases/calendar_flavor.html"
 
     def get_data(self, request, context, *args, **kwargs):
+        _require_flavor_reservation()
         add_timezone_context(self.request, context)
         context["calendar_title"] = _("Flavor Calendar")
         return context
 
 
 def calendar_data_view(request, resource_type):
+    if resource_type == "flavor":
+        _require_flavor_reservation()
     api_mapping = {
         "host": api.client.reservation_calendar,
         "network": api.client.network_reservation_calendar,
@@ -199,6 +213,7 @@ def extra_capabilities(request, resource_type):
 
 
 def flavors(request):
+    _require_flavor_reservation()
     return JsonResponse({'flavors': api.client.flavors(request)})
 
 
