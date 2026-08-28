@@ -38,6 +38,9 @@ flavor_reservation = (
         'enabled': False,
     }))
 
+baremetal_flavor_name = getattr(
+    settings, 'CHAMELEON_BAREMETAL_FLAVOR_NAME', 'baremetal')
+
 api_limit = getattr(settings, 'OPENSTACK_BLAZAR_API_LIMIT', 20)
 
 default_compute_node_type = getattr(

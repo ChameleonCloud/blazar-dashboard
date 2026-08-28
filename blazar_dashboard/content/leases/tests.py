@@ -411,3 +411,33 @@ class LeasesTests(test.TestCase):
         res = self.client.get(FLAVOR_CALENDAR_URL)
 
         self.assertContains(res, 'id="cookie_offset"')
+
+
+class FakeFlavor(object):
+    def __init__(self, name):
+        self.name = name
+
+    def to_dict(self):
+        return {'name': self.name}
+
+
+class FlavorReservationCandidateTests(test.TestCase):
+    def reservable_flavors(self, *names):
+        nova = mock.Mock()
+        nova.flavors.list.return_value = [FakeFlavor(n) for n in names]
+        with mock.patch.object(api.client._nova, 'novaclient',
+                               return_value=nova):
+            flavors = api.client.flavors(test.IsHttpRequest())
+        return [f['name'] for f in flavors]
+
+    @mock.patch.object(conf, 'baremetal_flavor_name', 'baremetal')
+    def test_baremetal_flavor_is_excluded(self):
+        self.assertEqual(
+            ['m1.small'],
+            self.reservable_flavors('m1.small', 'baremetal'))
+
+    @mock.patch.object(conf, 'baremetal_flavor_name', 'ironic-node')
+    def test_only_the_configured_flavor_is_excluded(self):
+        self.assertEqual(
+            ['m1.small', 'baremetal'],
+            self.reservable_flavors('m1.small', 'baremetal', 'ironic-node'))

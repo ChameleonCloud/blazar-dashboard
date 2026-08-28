@@ -19,6 +19,7 @@ import json
 import logging
 import re
 
+from blazar_dashboard import conf
 from blazarclient import client as blazar_client
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -585,7 +586,9 @@ def device_extra_capabilities(request):
 def flavors(request):
     # NOTE we need >=v2.61 (Queens) for flavor description, which will be useful for users.
     flavors = _nova.novaclient(request, version="2.61").flavors.list()
-    return [f.to_dict() for f in flavors]
+    return [
+        f.to_dict() for f in flavors if f.name != conf.baremetal_flavor_name
+    ]
 
 
 def get_floatingip_network_id(request, network_name_regex):
