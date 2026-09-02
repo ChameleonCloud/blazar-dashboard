@@ -18,6 +18,8 @@ from django.urls import reverse
 
 from blazar_dashboard import api
 from blazar_dashboard import conf
+from blazar_dashboard.content.leases import flavor_res_urls
+from blazar_dashboard.content.leases import urls as leases_urls
 from blazar_dashboard.content.leases import workflows as project_workflows
 from blazar_dashboard.test import helpers as test
 
@@ -441,3 +443,12 @@ class FlavorReservationCandidateTests(test.TestCase):
         self.assertEqual(
             ['m1.small', 'baremetal'],
             self.reservable_flavors('m1.small', 'baremetal', 'ironic-node'))
+
+
+class LeaseUrlTests(test.TestCase):
+    def test_panels_do_not_share_route_objects(self):
+        shared = [route for route in leases_urls.urlpatterns
+                  if any(route is other
+                         for other in flavor_res_urls.urlpatterns)]
+
+        self.assertEqual([], shared)

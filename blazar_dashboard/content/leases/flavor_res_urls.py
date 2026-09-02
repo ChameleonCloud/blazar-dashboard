@@ -10,22 +10,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-"""URLconf for the "Virtual Compute" leases panel.
-
-Composed from the same calendar routes as urls.py rather than including it,
-so this panel owns its own URLPattern objects: horizon rewrites them in place
-with the panel they belong to, so a shared list would misattribute the
-sidebar. Update and reallocate are the shared views.
-"""
-
 from django.urls import re_path
 
 from blazar_dashboard.content.leases import views as leases_views
-from blazar_dashboard.content.leases.urls import calendar_urlpatterns
+from blazar_dashboard.content.leases.urls import new_calendar_urlpatterns
 
 LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 
-urlpatterns = calendar_urlpatterns + [
+urlpatterns = new_calendar_urlpatterns() + [
     re_path(r'^$', leases_views.VirtualLeasesIndexView.as_view(),
         name='index'),
     re_path(r'^create/$', leases_views.VirtualCreateView.as_view(),
