@@ -196,6 +196,34 @@ def flavors(request):
 class DetailView(tabs.TabView):
     tab_group_class = project_tabs.LeaseDetailTabs
     template_name = 'project/leases/detail.html'
+    # Compute reservation type this detail view is for
+    lists = "physical:host"
+
+    def get(self, request, *args, **kwargs):
+        HOST_DETAIL = "horizon:project:leases:detail"
+        FLAVOR_DETAIL = "horizon:project:virtual_leases:detail"
+        # Bookmarks, docs and admin panels link to one panel whatever the
+        # lease reserves. Redirect to the panel that lists it.
+        lease_id = self.kwargs['lease_id']
+        try:
+            lease = api.client.lease_get(request, lease_id)
+        except Exception:
+            # Let the tab report the failure.
+            return super().get(request, *args, **kwargs)
+
+        types = compute_reservation_types(lease)
+        if types and self.lists not in types:
+            # Mismatched, so send it to the other panel.
+            target = (FLAVOR_DETAIL if self.lists == "physical:host"
+                      else HOST_DETAIL)
+            return redirect(reverse(target, args=[lease_id]))
+
+        # Base case
+        return super().get(request, *args, **kwargs)
+
+
+class VirtualDetailView(DetailView):
+    lists = "flavor:instance"
 
 
 class CreateView(workflows.WorkflowView):

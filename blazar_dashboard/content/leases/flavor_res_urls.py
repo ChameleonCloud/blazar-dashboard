@@ -30,7 +30,7 @@ urlpatterns = calendar_urlpatterns + [
         name='index'),
     re_path(r'^create/$', leases_views.VirtualCreateView.as_view(),
         name='create'),
-    re_path(LEASE_URL % '', leases_views.DetailView.as_view(),
+    re_path(LEASE_URL % '', leases_views.VirtualDetailView.as_view(),
         name='detail'),
     re_path(LEASE_URL % 'update', leases_views.UpdateView.as_view(),
         name='update'),
