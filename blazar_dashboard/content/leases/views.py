@@ -91,6 +91,7 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
 
 
 class VirtualLeasesIndexView(IndexView):
+    table_class = project_tables.VirtualLeasesTable
     lists = "flavor:instance"
 
 
@@ -209,6 +210,10 @@ class CreateView(workflows.WorkflowView):
             initial['max_hosts'] = 1
             initial['computehost_resource_properties'] = f'node_name == {node_name}'
         return initial
+
+
+class VirtualCreateView(CreateView):
+    workflow_class = project_workflows.VirtualCreateLease
 
 
 class UpdateView(workflows.WorkflowView):

@@ -28,7 +28,7 @@ LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 urlpatterns = calendar_urlpatterns + [
     re_path(r'^$', leases_views.VirtualLeasesIndexView.as_view(),
         name='index'),
-    re_path(r'^create/$', leases_views.CreateView.as_view(),
+    re_path(r'^create/$', leases_views.VirtualCreateView.as_view(),
         name='create'),
     re_path(LEASE_URL % '', leases_views.DetailView.as_view(),
         name='detail'),
