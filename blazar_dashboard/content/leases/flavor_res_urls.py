@@ -1,6 +1,3 @@
-# Copyright 2014 Intel Corporation
-# All Rights Reserved.
-#
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
 #    a copy of the License at
@@ -13,32 +10,30 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+"""URLconf for the "Virtual Compute" leases panel.
+
+Composed from the same calendar routes as urls.py rather than including it,
+so this panel owns its own URLPattern objects: horizon rewrites them in place
+with the panel they belong to, so a shared list would misattribute the
+sidebar. Update and reallocate are the shared views.
+"""
+
 from django.urls import re_path
 
 from blazar_dashboard.content.leases import views as leases_views
+from blazar_dashboard.content.leases.urls import calendar_urlpatterns
 
 LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 
-calendar_urlpatterns = [
-    re_path(r'^calendar/(?P<resource_type>(host|device|network))/$', leases_views.CalendarView.as_view(), name='calendar'),
-    re_path(r'^calendar/flavor/$', leases_views.FlavorCalendarView.as_view(), name='flavor_calendar'),
-    re_path(r'^calendar/(?P<resource_type>(host|device|network|flavor))/resources\.json$', leases_views.calendar_data_view,
-        name='calendar_data'),
-
-    re_path(r'^(?P<resource_type>[^/]+)/extras\.json$',
-        leases_views.extra_capabilities,
-        name='extra_capabilities'),
-    re_path(r'flavors\.json$',
-        leases_views.flavors,
-        name='flavors'),
-]
-
 urlpatterns = calendar_urlpatterns + [
-    re_path(r'^$', leases_views.IndexView.as_view(), name='index'),
-    re_path(r'^create/$', leases_views.CreateView.as_view(), name='create'),
+    re_path(r'^$', leases_views.IndexView.as_view(),
+        name='index'),
+    re_path(r'^create/$', leases_views.CreateView.as_view(),
+        name='create'),
     re_path(LEASE_URL % '', leases_views.DetailView.as_view(),
         name='detail'),
     re_path(LEASE_URL % 'update', leases_views.UpdateView.as_view(),
         name='update'),
-    re_path(LEASE_URL % 'reallocate', leases_views.ReallocateView.as_view(), name='reallocate'),
+    re_path(LEASE_URL % 'reallocate', leases_views.ReallocateView.as_view(),
+        name='reallocate'),
 ]
