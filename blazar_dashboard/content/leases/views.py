@@ -38,6 +38,13 @@ from horizon.utils import memoized
 
 LOG = logging.getLogger(__name__)
 
+COMPUTE_RESERVATION_TYPES = frozenset(["physical:host", "flavor:instance"])
+
+def compute_reservation_types(lease):
+    return COMPUTE_RESERVATION_TYPES & {
+        reservation["resource_type"] for reservation in lease["reservations"]}
+
+
 class IndexView(tables.PagedTableMixin, tables.DataTableView):
     table_class = project_tables.LeasesTable
     template_name = 'project/leases/index.html'
@@ -53,6 +60,18 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
             **filters,
        }
 
+    # Compute reservation type this panel lists.
+    lists = "physical:host"
+
+    def filter_leases(self, leases):
+        """Keep leases for this panel's compute type.
+
+        A lease reserving no compute (e.g. network only) is listed in both panels.
+        """
+        return [lease for lease in leases
+                if not compute_reservation_types(lease)
+                or self.lists in compute_reservation_types(lease)]
+
     def get_data(self):
         try:
             leases = api.client.lease_list(
@@ -61,12 +80,18 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
             )
             limit = self.get_data_kwargs()['limit']
             self._has_more_data = len(leases) == limit
+            # TODO(Mike): Breaks pagination, filter runs after the page fetch.
+            leases = self.filter_leases(leases)
         except Exception:
             leases = []
             self._has_more_data = False
             msg = _('Unable to retrieve lease information.')
             exceptions.handle(self.request, msg)
         return leases
+
+
+class VirtualLeasesIndexView(IndexView):
+    lists = "flavor:instance"
 
 
 def add_timezone_context(request, context):

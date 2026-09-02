@@ -26,7 +26,7 @@ from blazar_dashboard.content.leases.urls import calendar_urlpatterns
 LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 
 urlpatterns = calendar_urlpatterns + [
-    re_path(r'^$', leases_views.IndexView.as_view(),
+    re_path(r'^$', leases_views.VirtualLeasesIndexView.as_view(),
         name='index'),
     re_path(r'^create/$', leases_views.CreateView.as_view(),
         name='create'),
