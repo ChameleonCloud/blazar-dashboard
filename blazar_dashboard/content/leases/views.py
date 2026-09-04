@@ -38,6 +38,13 @@ from horizon.utils import memoized
 
 LOG = logging.getLogger(__name__)
 
+COMPUTE_RESERVATION_TYPES = frozenset(["physical:host", "flavor:instance"])
+
+def compute_reservation_types(lease):
+    return COMPUTE_RESERVATION_TYPES & {
+        reservation["resource_type"] for reservation in lease["reservations"]}
+
+
 class IndexView(tables.PagedTableMixin, tables.DataTableView):
     table_class = project_tables.LeasesTable
     template_name = 'project/leases/index.html'
@@ -53,6 +60,18 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
             **filters,
        }
 
+    # Compute reservation type this panel lists.
+    lists = "physical:host"
+
+    def filter_leases(self, leases):
+        """Keep leases for this panel's compute type.
+
+        A lease reserving no compute (e.g. network only) is listed in both panels.
+        """
+        return [lease for lease in leases
+                if not compute_reservation_types(lease)
+                or self.lists in compute_reservation_types(lease)]
+
     def get_data(self):
         try:
             leases = api.client.lease_list(
@@ -61,12 +80,19 @@ class IndexView(tables.PagedTableMixin, tables.DataTableView):
             )
             limit = self.get_data_kwargs()['limit']
             self._has_more_data = len(leases) == limit
+            # TODO(Mike): Breaks pagination, filter runs after the page fetch.
+            leases = self.filter_leases(leases)
         except Exception:
             leases = []
             self._has_more_data = False
             msg = _('Unable to retrieve lease information.')
             exceptions.handle(self.request, msg)
         return leases
+
+
+class VirtualLeasesIndexView(IndexView):
+    table_class = project_tables.VirtualLeasesTable
+    lists = "flavor:instance"
 
 
 def add_timezone_context(request, context):
@@ -170,6 +196,34 @@ def flavors(request):
 class DetailView(tabs.TabView):
     tab_group_class = project_tabs.LeaseDetailTabs
     template_name = 'project/leases/detail.html'
+    # Compute reservation type this detail view is for
+    lists = "physical:host"
+
+    def get(self, request, *args, **kwargs):
+        HOST_DETAIL = "horizon:project:leases:detail"
+        FLAVOR_DETAIL = "horizon:project:virtual_leases:detail"
+        # Bookmarks, docs and admin panels link to one panel whatever the
+        # lease reserves. Redirect to the panel that lists it.
+        lease_id = self.kwargs['lease_id']
+        try:
+            lease = api.client.lease_get(request, lease_id)
+        except Exception:
+            # Let the tab report the failure.
+            return super().get(request, *args, **kwargs)
+
+        types = compute_reservation_types(lease)
+        if types and self.lists not in types:
+            # Mismatched, so send it to the other panel.
+            target = (FLAVOR_DETAIL if self.lists == "physical:host"
+                      else HOST_DETAIL)
+            return redirect(reverse(target, args=[lease_id]))
+
+        # Base case
+        return super().get(request, *args, **kwargs)
+
+
+class VirtualDetailView(DetailView):
+    lists = "flavor:instance"
 
 
 class CreateView(workflows.WorkflowView):
@@ -184,6 +238,10 @@ class CreateView(workflows.WorkflowView):
             initial['max_hosts'] = 1
             initial['computehost_resource_properties'] = f'node_name == {node_name}'
         return initial
+
+
+class VirtualCreateView(CreateView):
+    workflow_class = project_workflows.VirtualCreateLease
 
 
 class UpdateView(workflows.WorkflowView):

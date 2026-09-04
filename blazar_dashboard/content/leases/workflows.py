@@ -522,8 +522,8 @@ class CreateLease(workflows.Workflow):
     failure_message = _('Unable to create the lease named "%s".')
     success_url = reverse_lazy('horizon:project:leases:index')
     wizard = True
-    default_steps = [SetGeneral, SetHosts, SetFlavors,
-                     SetNetworks, SetDevices]
+    # TODO(Mike): Make configurable
+    default_steps = [SetGeneral, SetHosts, SetNetworks, SetDevices]
 
     def format_status_message(self, message):
         return message % self.context.get('name')
@@ -668,6 +668,12 @@ class CreateLease(workflows.Workflow):
             exceptions.handle(request,
                               message='An error occurred while creating this '
                                       'lease: %s. Please try again.' % e)
+
+
+class VirtualCreateLease(CreateLease):
+    # Returns to the virtual list, which is where the new lease is listed.
+    success_url = reverse_lazy('horizon:project:virtual_leases:index')
+    default_steps = [SetGeneral, SetFlavors, SetNetworks, SetDevices]
 
 
 class UpdateGeneralAction(workflows.Action):
