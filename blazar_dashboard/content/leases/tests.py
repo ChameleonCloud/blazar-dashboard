@@ -10,11 +10,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import copy
 from datetime import datetime
 from datetime import timezone
+import re
 import unittest
 from unittest import mock
 
+from django.test import tag
 from django.urls import reverse
 
 from blazar_dashboard import api
@@ -468,3 +471,52 @@ class LeaseUrlTests(test.TestCase):
                          for other in flavor_res_urls.urlpatterns)]
 
         self.assertEqual([], shared)
+
+
+VIRTUAL_PANEL = '/project/virtual_leases/'
+
+
+def flavor_lease(base):
+    """A copy of base reserving a flavor, so the virtual panel lists it."""
+    lease = copy.deepcopy(base.to_dict())
+    reservation = copy.deepcopy(lease['reservations'][0])
+    reservation['resource_type'] = 'flavor:instance'
+    lease['reservations'] = [reservation]
+    return api.client.Lease(lease)
+
+
+def update_links(response):
+    """Every href in the rendered page that points at an update form."""
+    return re.findall(r'href="([^"]*/update)"', response.content.decode())
+
+
+@tag("hybrid_site")
+class VirtualLeasesUrlTests(test.TestCase):
+    """Acting on a virtual lease must not move the user to the other panel."""
+
+    def setUp(self):
+        super().setUp()
+        self.lease = flavor_lease(self.leases.get(name='lease-1'))
+        self.lease_id = self.lease['id']
+
+    @mock.patch.object(api.client, 'lease_list')
+    def test_the_update_action_links_into_the_virtual_panel(self, lease_list):
+        lease_list.return_value = [self.lease]
+
+        res = self.client.get(VIRTUAL_PANEL)
+
+        self.assertEqual(update_links(res),
+                         [VIRTUAL_PANEL + self.lease_id + '/update'])
+
+    @mock.patch.object(api.client, 'lease_update')
+    @mock.patch.object(api.client, 'lease_get')
+    def test_updating_a_virtual_lease_returns_to_the_virtual_panel(
+            self, lease_get, lease_update):
+        lease_get.return_value = self.lease
+        form_data = {'lease_id': self.lease_id, 'lease_name': 'renamed',
+                     'start_time': '', 'end_time': '', 'reservations': ''}
+
+        res = self.client.post(
+            VIRTUAL_PANEL + self.lease_id + '/update', form_data)
+
+        self.assertRedirectsNoFollow(res, VIRTUAL_PANEL)
