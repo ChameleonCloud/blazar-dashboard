@@ -45,14 +45,7 @@ class OverviewTab(tabs.Tab):
     template_name = "project/leases/_detail_overview.html"
 
     def get_context_data(self, request):
-        lease_id = self.tab_group.kwargs['lease_id']
-        try:
-            lease = client.lease_get(self.request, lease_id)
-        except Exception:
-            redirect = reverse('horizon:project:leases:index')
-            msg = _('Unable to retrieve lease details.')
-            exceptions.handle(request, msg, redirect=redirect)
-
+        lease = self.tab_group.kwargs['lease']
         try:
             nodes = client.nodes_in_lease(self.request, lease)
         except Exception:

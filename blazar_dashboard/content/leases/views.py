@@ -198,6 +198,28 @@ class DetailView(tabs.TabView):
     template_name = 'project/leases/detail.html'
     # Compute reservation type this detail view is for
     lists = "physical:host"
+    redirect_url = 'horizon:project:leases:index'
+
+    @memoized.memoized_method
+    def get_data(self):
+        lease_id = self.kwargs['lease_id']
+        try:
+            lease = api.client.lease_get(self.request, lease_id)
+        except Exception:
+            redirect = reverse(self.redirect_url)
+            exceptions.handle(self.request,
+                              _('Unable to retrieve details for '
+                                'lease "%s".') % lease_id,
+                              redirect=redirect)
+            # Not all exception types handled above will result in a redirect.
+            # Need to raise here just in case.
+            raise exceptions.Http302(redirect)
+
+        return lease
+
+    def get_tabs(self, request, *args, **kwargs):
+        lease = self.get_data()
+        return self.tab_group_class(request, lease=lease, **kwargs)
 
     def get(self, request, *args, **kwargs):
         HOST_DETAIL = "horizon:project:leases:detail"
@@ -205,13 +227,7 @@ class DetailView(tabs.TabView):
         # Bookmarks, docs and admin panels link to one panel whatever the
         # lease reserves. Redirect to the panel that lists it.
         lease_id = self.kwargs['lease_id']
-        try:
-            lease = api.client.lease_get(request, lease_id)
-        except Exception:
-            # Let the tab report the failure.
-            return super().get(request, *args, **kwargs)
-
-        types = compute_reservation_types(lease)
+        types = compute_reservation_types(self.get_data())
         if types and self.lists not in types:
             # Mismatched, so send it to the other panel.
             target = (FLAVOR_DETAIL if self.lists == "physical:host"
