@@ -782,7 +782,7 @@ class UpdateLease(workflows.Workflow):
     success_message = _('Request for updating a lease named "%s" '
                         'has been submitted.')
     failure_message = _('Unable to update the lease named "%s".')
-    success_url = reverse_lazy('horizon:project:leases:index')
+    success_url = 'horizon:project:leases:index'
     wizard = True
     default_steps = [UpdateGeneral]
 
