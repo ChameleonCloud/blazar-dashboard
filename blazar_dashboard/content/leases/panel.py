@@ -26,6 +26,7 @@ class Leases(horizon.Panel):
 class VirtualLeases(Leases):
     name = _("Leases")
     slug = "virtual_leases"
+    app_namespace = "leases"
     urls = 'blazar_dashboard.content.leases.flavor_res_urls'
 
     @staticmethod
