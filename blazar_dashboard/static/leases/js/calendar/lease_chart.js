@@ -246,7 +246,7 @@
           events: {
             updated: function (chartContext, config) {
               $('.apexcharts-yaxis-label').css('cursor', 'pointer').off('click').on('click', function (e) {
-                var nodeName = $(this).text();
+                var nodeName = $(this).children('title').text();
                 var createUrl = '../../create/?node_name=' + encodeURIComponent(nodeName);
                 var link = document.createElement('a');
                 link.setAttribute('href', createUrl);
