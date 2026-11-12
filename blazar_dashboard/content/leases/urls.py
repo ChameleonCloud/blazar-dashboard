@@ -17,18 +17,32 @@ from django.urls import re_path
 
 from blazar_dashboard.content.leases import views as leases_views
 
+LEASE_URL = r'^(?P<lease_id>[^/]+)/%s$'
 
-urlpatterns = [
-    re_path(r'^calendar/(?P<resource_type>[^/]+)/$',
-            leases_views.CalendarView.as_view(), name='calendar'),
-    re_path(r'^calendar/(?P<resource_type>[^/]+)/resources\.json$',
-            leases_views.calendar_data_view,
+
+def new_calendar_urlpatterns():
+    """Return a new set of calendar routes to avoid per panel mutation."""
+    return [
+        re_path(r'^calendar/(?P<resource_type>(host|device|network))/$', leases_views.CalendarView.as_view(), name='calendar'),
+        re_path(r'^calendar/flavor/$', leases_views.FlavorCalendarView.as_view(), name='flavor_calendar'),
+        re_path(r'^calendar/(?P<resource_type>(host|device|network|flavor))/resources\.json$', leases_views.calendar_data_view,
             name='calendar_data'),
+
+        re_path(r'^(?P<resource_type>[^/]+)/extras\.json$',
+            leases_views.extra_capabilities,
+            name='extra_capabilities'),
+        re_path(r'flavors\.json$',
+            leases_views.flavors,
+            name='flavors'),
+    ]
+
+
+urlpatterns = new_calendar_urlpatterns() + [
     re_path(r'^$', leases_views.IndexView.as_view(), name='index'),
     re_path(r'^create/$', leases_views.CreateView.as_view(), name='create'),
-    re_path(r'^(?P<lease_id>[^/]+)/$', leases_views.DetailView.as_view(),
-            name='detail'),
-    re_path(r'^(?P<lease_id>[^/]+)/update$',
-            leases_views.UpdateView.as_view(),
-            name='update'),
+    re_path(LEASE_URL % '', leases_views.DetailView.as_view(),
+        name='detail'),
+    re_path(LEASE_URL % 'update', leases_views.UpdateView.as_view(),
+        name='update'),
+    re_path(LEASE_URL % 'reallocate', leases_views.ReallocateView.as_view(), name='reallocate'),
 ]

@@ -12,27 +12,37 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
+import logging
 from datetime import datetime
 from datetime import timezone
 from functools import partial
 
+from blazar_dashboard import api
+from blazar_dashboard import conf
 from django.template import defaultfilters as django_filters
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext_lazy
 from horizon import tables
 from horizon.utils import filters
 
-from blazar_dashboard import api
-from blazar_dashboard import conf
+LOG = logging.getLogger(__name__)
 
 
 class CreateLease(tables.LinkAction):
     name = "create"
     verbose_name = _("Create Lease")
     url = "horizon:project:leases:create"
-    classes = ("ajax-modal",)
+    classes = ("btn-create", "btn-primary", "ajax-modal", )
     icon = "plus"
+    ajax = True
+
+    def __init__(self, attrs=None, **kwargs):
+        kwargs['preempt'] = True
+        super(CreateLease, self).__init__(attrs, **kwargs)
+
+
+class CreateVirtualLease(CreateLease):
+    url = "horizon:project:virtual_leases:create"
 
 
 class UpdateLease(tables.LinkAction):
@@ -52,6 +62,30 @@ class ViewHostReservationCalendar(tables.LinkAction):
     name = "calendar"
     verbose_name = _("Host Calendar")
     url = "calendar/host/"
+    classes = ("btn-default", )
+    icon = "calendar"
+
+
+class ViewNetworkReservationCalendar(tables.LinkAction):
+    name = "network_calendar"
+    verbose_name = _("Network Calendar")
+    url = "calendar/network/"
+    classes = ("btn-default", )
+    icon = "calendar"
+
+
+class ViewDeviceReservationCalendar(tables.LinkAction):
+    name = "device_calendar"
+    verbose_name = _("Device Calendar")
+    url = "calendar/device/"
+    classes = ("btn-default", )
+    icon = "calendar"
+
+
+class ViewFlavorReservationCalendar(tables.LinkAction):
+    name = "flavor_calendar"
+    verbose_name = _("Flavor Calendar")
+    url = "calendar/flavor/"
     classes = ("btn-default", )
     icon = "calendar"
 
@@ -82,17 +116,24 @@ class DeleteLease(tables.DeleteAction):
         api.client.lease_delete(request, lease_id)
 
 
+class LeaseFilterAction(tables.FilterAction):
+    name = "filter_leases"
+    filter_type = "server"
+    filter_choices = (
+        ('status', _("Status ="), True),
+        ('lease_name', _("Lease Name ="), True),
+        ('lease_id', _("Lease ID ="), True)
+    )
+
+
 class LeasesTable(tables.DataTable):
     name = tables.Column("name", verbose_name=_("Lease name"),
                          link="horizon:project:leases:detail",)
+    user_id = tables.Column("user_id", verbose_name=_("Created by"))
     start_date = tables.Column("start_date", verbose_name=_("Start date"),
-                               filters=(filters.parse_isotime,
-                                        partial(django_filters.date,
-                                                arg='Y-m-d H:i T')),)
+                               filters=(filters.parse_isotime,))
     end_date = tables.Column("end_date", verbose_name=_("End date"),
-                             filters=(filters.parse_isotime,
-                                      partial(django_filters.date,
-                                              arg='Y-m-d H:i T')),)
+                             filters=(filters.parse_isotime,),)
     status = tables.Column("status", verbose_name=_("Status"),)
     degraded = tables.Column("degraded", verbose_name=_("Degraded"),
                              filters=(django_filters.yesno,
@@ -101,7 +142,34 @@ class LeasesTable(tables.DataTable):
     class Meta(object):
         name = "leases"
         verbose_name = _("Leases")
-        table_actions = [CreateLease, DeleteLease, ]
+        pagination_param = "marker"
+        table_actions = [CreateLease, DeleteLease, LeaseFilterAction, ]
+        if conf.floatingip_reservation.get('enabled'):
+            # TODO: put in floating IP calendar support
+            pass
+        if conf.network_reservation.get('enabled'):
+            table_actions.insert(0, ViewNetworkReservationCalendar)
         if conf.host_reservation.get('enabled'):
             table_actions.insert(0, ViewHostReservationCalendar)
+        if conf.device_reservation.get('enabled'):
+            table_actions.insert(0, ViewDeviceReservationCalendar)
+
         row_actions = (UpdateLease, DeleteLease, )
+
+
+class VirtualLeasesTable(LeasesTable):
+    name = tables.Column("name", verbose_name=_("Lease name"),
+                         link="horizon:project:virtual_leases:detail",)
+
+    class Meta(LeasesTable.Meta):
+        name = "virtual_leases"
+        verbose_name = _("Virtual Leases")
+        # This panel reserves flavors, so it offers the flavor calendar
+        # where the baremetal panel offers the host one.
+        table_actions = [CreateVirtualLease, DeleteLease, LeaseFilterAction, ]
+        if conf.network_reservation.get('enabled'):
+            table_actions.insert(0, ViewNetworkReservationCalendar)
+        if conf.device_reservation.get('enabled'):
+            table_actions.insert(0, ViewDeviceReservationCalendar)
+        if conf.flavor_reservation.get('enabled'):
+            table_actions.insert(0, ViewFlavorReservationCalendar)

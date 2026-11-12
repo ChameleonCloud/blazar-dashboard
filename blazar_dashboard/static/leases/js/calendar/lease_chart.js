@@ -1,129 +1,365 @@
-(function(window, horizon, $, undefined) {
+(function (window, horizon, $, undefined) {
   'use strict';
 
+  const RESTRICTED_BACKGROUND_COLOR = "#aaa";
   const CHART_TITLE_HEIGHT = 68;
   const ROW_HEIGHT = 60;
 
-  const selector = '#blazar-calendar-host';
-  const pluralResourceType = gettext("Hosts");
-  if ($(selector).length < 1) return;
-  const calendarElement = $(selector);
-  const form = $('form[name="blazar-calendar-controls"]');
+  var selector = undefined; // what selector determines the calendarElement
+  var rowAttr = undefined; // what attribute from resources.json labels each chart row
+  var pluralResourceType = undefined; // This resource type plural display name
+
+  // Used for the chooser filter. Leave undefined for no filter
+  var chooserAttr = undefined; // what attribute from resources.json should be used to categorize resources
+  var chooserAttrPretty = undefined; // display name for chooserAttr
+  var populateChooser = undefined; // a function that (partially) fills the resource category filter
+  if ($('#blazar-calendar-host').length !== 0) {
+    selector = '#blazar-calendar-host';
+    rowAttr = "node_name";
+    pluralResourceType = gettext("Hosts");
+    chooserAttr = "node_type";
+    chooserAttrPretty = gettext("Node Type");
+    var preselectedNodeType = new URLSearchParams(window.location.search).get('node_type') || "compute_skylake";
+    populateChooser = function (chooser, availableResourceTypes) {
+      var nodeTypesPretty = [ // preserve order so it's not random
+        ['compute', gettext('Compute Node')],
+        ['storage', gettext('Storage')],
+        ['gpu_k80', gettext('GPU (K80)')],
+        ['gpu_m40', gettext('GPU (M40)')],
+        ['gpu_p100', gettext('GPU (P100)')],
+        ['gpu_p100_nvlink', gettext('GPU (P100 + NVLink)')],
+        ['gpu_p100_v100', gettext('GPU (P100 + V100)')],
+        ['compute_cascadelake', gettext('Cascade Lake')],
+        ['compute_cascadelake_r', gettext('Cascade Lake R')],
+        ['compute_skylake', gettext('Skylake')],
+        ['compute_haswell', gettext('Haswell')],
+        ['compute_haswell_ib', gettext('Haswell + Infiniband Support')],
+        ['compute_ib', gettext('Infiniband Support')],
+        ['storage_hierarchy', gettext('Storage Hierarchy')],
+        ['fpga', gettext('FPGA')],
+        ['lowpower_xeon', gettext('Low power Xeon')],
+        ['atom', gettext('Atom')],
+        ['arm64', gettext('ARM64')],
+      ];
+      nodeTypesPretty.forEach(function (nt) {
+        if (availableResourceTypes[nt[0]]) {
+          var isSelected = nt[0] === preselectedNodeType;
+          chooser.append(
+            new Option(
+              nt[1],
+              nt[0],
+              isSelected,
+              isSelected
+            )
+          );
+          delete availableResourceTypes[nt[0]];
+        }
+      });
+    };
+  }
+  if ($('#blazar-calendar-network').length !== 0) {
+    selector = '#blazar-calendar-network'
+    pluralResourceType = gettext("Networks")
+    rowAttr = "segment_id";
+
+    chooserAttr = "network_type";
+    chooserAttrPretty = gettext("Network Type");
+    populateChooser = function (chooser, availableResourceTypes) {
+      const networkTypesPretty = [
+        ['vlan', gettext("VLAN")],
+      ];
+      networkTypesPretty.forEach((nt) => {
+        if (availableResourceTypes[nt[0]]) {
+          chooser.append(new Option(nt[1], nt[0], false, false));
+          delete availableResourceTypes[nt[0]];
+        }
+      });
+    };
+  }
+  if ($('#blazar-calendar-device').length !== 0) {
+    selector = '#blazar-calendar-device'
+    pluralResourceType = gettext("Devices")
+    rowAttr = "device_name";
+
+    chooserAttr = "vendor";
+    chooserAttrPretty = gettext("Vendor");
+    populateChooser = function (chooser, availableResourceTypes) { };
+  }
+  if (selector == undefined) return;
+  var calendarElement = $(selector);
+  var projectId; // Used to avoid showing restricted devices if this project is authorized
 
   function init() {
+    var chart; // The chart object
+    var allReservations;
+    var filteredReservations; // Reservations to show based on filter
+    var form;
+    var resources; // Used to calculate the height of the chart
+    var currentResources; // May be filtered
+
+    // Guard against re-running init() and a pointless calendar.json load.
+    // Horizon seems to call us twice for some reason
+    if (calendarElement.hasClass("loaded").length > 0) {
+      console.log('blocking duplicate init');
+    }
     calendarElement.addClass('loaded');
+    let fixedResources = [];
+
+    var localOffsetStr = $('#cookie_offset').val();
+    var tzOffsetDiff = 0; // ms to shift chart
+    if (localOffsetStr) {
+      var userOffset = parseInt(localOffsetStr);
+      tzOffsetDiff = userOffset * -60000;
+    }
+
+    const onCalendarFilterChange = function () {
+      const chosenType = $('#resource-type-chooser').val();
+      filteredReservations = allReservations.map(function (reservation) {
+        const reservationCopy = Object.assign({}, reservation);
+        reservationCopy.data = reservation.data.filter(function (resource) {
+          return chosenType === '*' || chosenType === resource[chooserAttr];
+        });
+        return reservationCopy;
+      });
+      currentResources = fixedResources.filter(function (resource) {
+        return chosenType === '*' || chosenType === resource[chooserAttr];
+      });
+      chart.updateOptions({
+        series: filteredReservations,
+        grid: { row: { colors: getGridBackground(currentResources) } },
+        chart: { height: ROW_HEIGHT * currentResources.length + CHART_TITLE_HEIGHT }
+      });
+      setTimeDomain(getTimeDomain());
+
+      const filterHeader = $('#blazar-calendar-filter-header');
+      if (chosenType === '*') {
+        filterHeader.html(`Showing all ${pluralResourceType}`);
+      } else {
+        filterHeader.html(`Showing all ${chosenType} ${pluralResourceType}`);
+      }
+    };
+
     $.getJSON("resources.json")
-      .done(function(resp) {
-        const rowAttr = resp.row_attr;
-        // For this row shows up at all, we need at least 1 data point.
-        const reservationsById = {}
-        resp.reservations.forEach(function(reservation){
-          if(!(reservation.reservation_id in reservationsById)){
-            reservationsById[reservation.reservation_id] = reservation
-            reservation.name = reservation.reservation_id
+      .done(function (resp) {
+        projectId = resp.project_id;
+
+        // Fix network segment_id to string
+        if (selector === '#blazar-calendar-network') {
+          resp.resources.forEach(function (resource) {
+            resource[rowAttr] = resource[rowAttr].toString();
+          });
+          resp.reservations.forEach(function (reservation) {
+            reservation[rowAttr] = reservation[rowAttr].toString();
+          });
+        }
+        fixedResources = resp.resources;
+        currentResources = fixedResources;
+        resources = fixedResources;
+
+        var reservationsWithResources = resp.reservations;
+        reservationsWithResources.forEach(function (reservation) {
+          fixedResources.forEach(function (resource) {
+            if (reservation[rowAttr] == resource[rowAttr]) {
+              reservation[chooserAttr] = resource[chooserAttr]
+            }
+          })
+        });
+        var reservationsById = {}
+        reservationsWithResources.forEach(function (reservation) {
+          if (!(reservation.id in reservationsById)) {
+            reservationsById[reservation.id] = reservation
+            reservation.name = reservation.id
             reservation.data = []
           }
-          const newReservation = {
-            'start_date': new Date(reservation.start_date),
-            'end_date': new Date(reservation.end_date),
+          var startDateshifted = new Date(new Date(reservation.start_date).getTime() + tzOffsetDiff);
+          var endDateshifted = new Date(new Date(reservation.end_date).getTime() + tzOffsetDiff);
+          // Hacky way to format the datestring properly.
+          reservation.start_date_display = startDateshifted.toISOString().slice(0, 16).replace('T', ' ')
+          reservation.end_date_display = endDateshifted.toISOString().slice(0, 16).replace('T', ' ')
+          var newReservation = {
+            'start_date': startDateshifted,
+            'end_date': endDateshifted,
             'x': reservation[rowAttr],
             'y': [
-              new Date(reservation.start_date).getTime(),
-              new Date(reservation.end_date).getTime()
+              startDateshifted,
+              endDateshifted
             ],
           }
-          reservationsById[reservation.reservation_id].data.push(newReservation)
+          newReservation[chooserAttr] = reservation[chooserAttr]
+          reservationsById[reservation.id].data.push(newReservation)
         })
-        reservationsById["0"] = {"name": "0", "data": []}
-        resp.resources.forEach(function(resource){
-          reservationsById["0"].data.push({x: resource[rowAttr], y: [0, 0]})
+        // Dummy data to force rendering of all resources
+        reservationsById["0"] = { "name": "0", "data": [] }
+        // For this row shows up at all, we need at least 1 data point.
+        fixedResources.forEach(function (resource) {
+          var dummyData = { x: resource[rowAttr], y: [0, 0] }
+          dummyData[chooserAttr] = resource[chooserAttr]
+          reservationsById["0"].data.push(dummyData)
         })
-        const allReservations = Object.values(reservationsById)
-        constructCalendar(allReservations, computeTimeDomain(7), resp.resources)
-    })
-    .fail(function() {
-      calendarElement.html(`<div class="alert alert-danger">${gettext("Unable to load reservations")}.</div>`);
-    });
+        allReservations = Object.values(reservationsById)
 
-    function constructCalendar(rows, timeDomain, resources){
+        filteredReservations = allReservations;
+
+        // populate resource-type-chooser
+        var chooser = $("#resource-type-chooser");
+        if (populateChooser != undefined) {
+          $("label[for='resource-type-chooser']").text(chooserAttrPretty);
+          var availableResourceTypes = {};
+          fixedResources.forEach(function (resource) {
+            availableResourceTypes[resource[chooserAttr]] = true;
+          });
+          chooser.empty();
+          chooser.append(new Option(`${gettext("All")} ${pluralResourceType}`, '*'));
+          populateChooser(chooser, availableResourceTypes)
+          Object.keys(availableResourceTypes).forEach(function (key) {
+            chooser.append(new Option(key, key));
+          });
+          // Set the dropdown value to the preselected node type if it exists in the options
+          if (preselectedNodeType && chooser.find("option[value='" + preselectedNodeType + "']").length) {
+            chooser.val(preselectedNodeType);
+          }
+          chooser.prop('disabled', false);
+          chooser.change(onCalendarFilterChange);
+        } else {
+          chooser.hide()
+        }
+        constructCalendar(filteredReservations, computeTimeDomain(7))
+      })
+      .fail(function () {
+        calendarElement.html(`<div class="alert alert-danger">${gettext("Unable to load reservations")}.</div>`);
+      });
+
+    function constructCalendar(rows, timeDomain) {
       calendarElement.empty();
-      const options = {
+      var options = {
         series: rows,
         chart: {
           type: 'rangeBar',
-          toolbar: {show: false},
-          zoom: {enabled: false, type: 'xy'},
+          toolbar: { show: false },
+          zoom: { enabled: false, type: 'xy' },
           height: ROW_HEIGHT * resources.length + CHART_TITLE_HEIGHT,
           width: "100%",
+          stroke: {
+            width: 2,
+            curve: 'straight'
+          },
+          events: {
+            updated: function (chartContext, config) {
+              $('.apexcharts-yaxis-label').css('cursor', 'pointer').off('click').on('click', function (e) {
+                var nodeName = $(this).children('title').text();
+                var createUrl = '../../create/?node_name=' + encodeURIComponent(nodeName);
+                var link = document.createElement('a');
+                link.setAttribute('href', createUrl);
+                link.setAttribute('class', 'ajax-modal');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              });
+              $(`rect.apexcharts-grid-row[fill='${RESTRICTED_BACKGROUND_COLOR}']`).mouseout(function (event) {
+                $("#resource-disabled-tooltip").hide();
+              });
+              $(`rect.apexcharts-grid-row[fill='${RESTRICTED_BACKGROUND_COLOR}']`).mouseenter(function (event) {
+                var tooltip = $("#resource-disabled-tooltip").show();
+                // Update restriction reason in tooltip
+                var index = $('rect.apexcharts-grid-row').index(event.target);
+                var resource = currentResources[index]
+                tooltip.find(".reason-down").toggle(resource["reservable"] === false);
+                tooltip.find(".reason-restricted").toggle("authorized_projects" in resource);
+                $("#restricted-reason-dl").toggle("restricted_reason" in resource);
+                $("#restricted-reason-dl dd").text(resource["restricted_reason"]);
+              });
+              $(`rect.apexcharts-grid-row[fill='${RESTRICTED_BACKGROUND_COLOR}']`).mousemove(function (event) {
+                // Update x,y position of tooltip
+                var sidebar = $("#sidebar");
+                var sidebarOffset = sidebar.position().left + sidebar.width();
+                var topbar = $(".navbar-fixed-top");
+                var topbarOffset = topbar.position().top + topbar.height();
+                $("#resource-disabled-tooltip").show().css({
+                  left: event.pageX - sidebarOffset + 20,
+                  top: event.pageY - topbarOffset + 20,
+                });
+              });
+            }
+          }
         },
-        plotOptions: { bar: {horizontal: true, rangeBarGroupRows: true}},
+        plotOptions: { bar: { horizontal: true, rangeBarGroupRows: true } },
         xaxis: { type: 'datetime' },
         legend: { show: false },
+        grid: { row: { colors: getGridBackground(resources) } },
         tooltip: {
-          custom: function({series, seriesIndex, dataPointIndex, w}) {
-            const datum = rows[seriesIndex];
-            const resourcesReserved = datum.data.map(function(el){ return el.x }).join("<br>");
-            const project_dt = "";
-            if(datum.project_id){
+          custom: function ({ series, seriesIndex, dataPointIndex, w }) {
+            var datum = rows[seriesIndex];
+            var resourcesReserved = datum.data.map(function (el) { return el.x }).join("<br>");
+            var project_dt = "";
+            if (datum.project_id) {
               project_dt = `<dt>${gettext("Project")}</dt>
                 <dd>${datum.project_id}</dd>`;
+            }
+            var extras_dt = "";
+            if (datum.extras) {
+              datum.extras.forEach(function (item) {
+                var title = item[0];
+                var value = item[1];
+                extras_dt += `<dt>${title}</dt><dd>${value}</dd>`;
+              });
             }
             return `<div class='tooltip-content'><dl>
               ${project_dt}
               <dt>${pluralResourceType}</dt>
                 <dd>${resourcesReserved}</dd>
               <dt>${gettext("Reserved")}</dt>
-                <dd>${datum.start_date} <strong>${gettext("to")}</strong> ${datum.end_date}</dd>
+                <dd>${datum.start_date_display} <strong>${gettext("to")}</strong> ${datum.end_date_display}</dd>
+              ${extras_dt}
             </dl></div>`;
           }
         },
         annotations: {
           xaxis: [
             {
-              x: new Date().getTime(),
+              x: new Date().getTime() + tzOffsetDiff,
               borderColor: '#00E396',
             }
           ]
         },
-      }
-      const chart = new ApexCharts(document.querySelector(selector), options);
-      chart.render();
-
-      setTimeDomain(timeDomain, chart); // Also sets the yaxis limits
-
-      $('input[data-datepicker]', form).datepicker({
-        dateFormat: 'mm/dd/yyyy'
-      });
-
-      $('input', form).on('change', function() {
-        if (form.hasClass('time-domain-processed')) {
-          const timeDomain = getTimeDomain();
-          // If invalid ordering is chosen, set period to 1 day
-          if (timeDomain[0] >= timeDomain[1]) {
-            timeDomain[1] = d3.time.day.offset(timeDomain[0], +1);
-          }
-          setTimeDomain(timeDomain, chart);
+        // Free performance
+        animations: {
+          enabled: false
+        },
+        dataLabels: {
+          enabled: false
         }
-      });
+      }
+      chart = new ApexCharts(document.querySelector(selector), options);
+      chart.render();
+      setTimeDomain(timeDomain); // Also sets the yaxis limits
+      // Filter default selection
+      onCalendarFilterChange();
+    }
 
-      $('.calendar-quickdays').click(function() {
-        const days = parseInt($(this).data("calendar-days"));
-        if (!isNaN(days)) {
-          const timeDomain = computeTimeDomain(days);
-          setTimeDomain(timeDomain, chart);
+    function getGridBackground(resources) {
+      return resources.map(function (resource) {
+        if (resource["reservable"] === false) {
+          return RESTRICTED_BACKGROUND_COLOR;
+        }
+        if (resource["authorized_projects"]) {
+          var projects = resource["authorized_projects"].split(",")
+          if (!projects.includes(projectId)) {
+            return RESTRICTED_BACKGROUND_COLOR;
+          }
         }
       })
     }
 
     function computeTimeDomain(days) {
-      const padFraction = 1/8; // chart default is 3 hours for 1 day
+      var padFraction = 1 / 8; // chart default is 3 hours for 1 day
+      var shiftedNow = Date.now() + tzOffsetDiff;
       return [
-        d3.time.day.offset(Date.now(), -days * padFraction),
-        d3.time.day.offset(Date.now(), days * (1 + padFraction))
+        d3.time.day.offset(shiftedNow, -days * padFraction),
+        d3.time.day.offset(shiftedNow, days * (1 + padFraction))
       ];
     }
 
-    function setTimeDomain(timeDomain, chart) {
+    function setTimeDomain(timeDomain) {
       // Set the input elements
       form.removeClass('time-domain-processed');
       $('#dateStart').datepicker('setDate', timeDomain[0]);
@@ -131,12 +367,15 @@
       $('#dateEnd').datepicker('setDate', timeDomain[1]);
       $('#timeEndHours').val(timeDomain[1].getHours());
       form.addClass('time-domain-processed');
-      const options = { yaxis: {min: timeDomain[0].getTime(), max: timeDomain[1].getTime()}}
-      chart.updateOptions(options)
+      // If the chart exists, update its axis
+      if (chart) {
+        var options = { yaxis: { min: timeDomain[0].getTime(), max: timeDomain[1].getTime() } }
+        chart.updateOptions(options)
+      }
     }
 
     function getTimeDomain() {
-      const timeDomain = [
+      var timeDomain = [
         $('#dateStart').datepicker('getDate'),
         $('#dateEnd').datepicker('getDate')
       ];
@@ -148,6 +387,31 @@
 
       return timeDomain;
     }
+
+    form = $('form[name="blazar-calendar-controls"]');
+
+    $('input[data-datepicker]', form).datepicker({
+      dateFormat: 'mm/dd/yyyy'
+    });
+
+    $('input', form).on('change', function () {
+      if (form.hasClass('time-domain-processed')) {
+        var timeDomain = getTimeDomain();
+        // If invalid ordering is chosen, set period to 1 day
+        if (timeDomain[0] >= timeDomain[1]) {
+          timeDomain[1] = d3.time.day.offset(timeDomain[0], +1);
+        }
+        setTimeDomain(timeDomain);
+      }
+    });
+
+    $('.calendar-quickdays').click(function () {
+      var days = parseInt($(this).data("calendar-days"));
+      if (!isNaN(days)) {
+        var timeDomain = computeTimeDomain(days);
+        setTimeDomain(timeDomain);
+      }
+    });
   }
 
   horizon.addInitFunction(init);

@@ -10,28 +10,54 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from collections import OrderedDict
+import asyncio
 from datetime import datetime
 from datetime import timezone
 from itertools import chain
 import json
 import logging
+import re
 
 from blazar_dashboard import conf
+from blazarclient import client as blazar_client
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from horizon import exceptions
 from horizon.utils.memoized import memoized
 from keystoneauth1.identity import v3
 from keystoneauth1 import session
 from openstack_dashboard.api import base
-
-from blazarclient import client as blazar_client
+from openstack_dashboard.api import neutron
+from openstack_dashboard.api import _nova
+from openstack_dashboard.api import placement
 
 
 LOG = logging.getLogger(__name__)
+LEASE_DATE_FORMAT = "%Y-%m-%d %H:%M"
+
+PRETTY_TYPE_NAMES = OrderedDict([
+    ('compute', _('Compute Node (default)')),
+    ('storage', _('Storage')),
+    ('gpu_k80', _('GPU (K80)')),
+    ('gpu_m40', _('GPU (M40)')),
+    ('gpu_p100', _('GPU (P100)')),
+    ('compute_ib', _('Infiniband Support')),
+    ('storage_hierarchy', _('Storage Hierarchy')),
+    ('fpga', _('FPGA')),
+    ('lowpower_xeon', _('Low power Xeon')),
+    ('atom', _('Atom')),
+    ('arm64', _('ARM64')),
+])
+
+PRETTY_EXTRA_LABELS = {
+    "user_name": _("Reserved by")
+}
 
 
 class Lease(base.APIDictWrapper):
     """Represents one Blazar lease."""
+
     _attrs = ['id', 'name', 'start_date', 'end_date', 'user_id', 'project_id',
               'before_end_date', 'status', 'degraded']
 
@@ -45,7 +71,8 @@ class Host(base.APIDictWrapper):
     _attrs = ['id', 'hypervisor_hostname', 'hypervisor_type',
               'hypervisor_version', 'vcpus', 'cpu_info', 'memory_mb',
               'local_gb', 'status', 'created_at', 'updated_at',
-              'service_name', 'trust_id', 'reservable']
+              'service_name', 'trust_id', 'reservable', 'node_type',
+              'node_name']
 
     def __init__(self, apiresource):
         super(Host, self).__init__(apiresource)
@@ -64,9 +91,53 @@ class Host(base.APIDictWrapper):
         return excaps
 
 
+class Network(base.APIDictWrapper):
+    """Represents one Blazar network."""
+
+    _attrs = ['id', 'network_type', 'physical_network', 'segment_id',
+              'created_at', 'updated_at']
+
+    def __init__(self, apiresource):
+        super(Network, self).__init__(apiresource)
+
+    def extra_capabilities(self):
+        excaps = {}
+        for k, v in self._apidict.items():
+            if k not in self._attrs:
+                excaps[k] = v
+        return excaps
+
+
+class Device(base.APIDictWrapper):
+    """Represents one Blazar device."""
+
+    _attrs = ['id', 'name', 'device_type', 'device_driver']
+
+    def __init__(self, apiresource):
+        super(Device, self).__init__(apiresource)
+
+    def extra_capabilities(self):
+        excaps = {}
+        for k, v in self._apidict.items():
+            if k not in self._attrs:
+                excaps[k] = v
+        return excaps
+
+
 class Allocation(base.APIDictWrapper):
 
     _attrs = ['resource_id', 'reservations']
+
+    def __init__(self, apiresource):
+        super(Allocation, self).__init__(apiresource)
+
+
+class ExtraCapability(base.APIDictWrapper):
+
+    _attrs = ['property', 'private', 'property_values']
+
+    def __init__(self, apiresource):
+        super(ExtraCapability, self).__init__(apiresource)
 
 
 @memoized
@@ -94,10 +165,27 @@ def blazarclient(request):
     return blazar_client.Client(session=sess)
 
 
-def lease_list(request):
+def lease_list(
+    request,
+    all_tenants=False,
+    status=None,
+    project_id=None,
+    lease_name=None,
+    lease_id=None,
+    limit=None,
+    marker=None,
+):
     """List the leases."""
-    leases = blazarclient(request).lease.list()
-    return [Lease(lease) for lease in leases]
+    leases = blazarclient(request).lease.list(
+        all_tenants=all_tenants,
+        status=status,
+        limit=limit,
+        project_id=project_id,
+        lease_id=lease_id,
+        lease_name=lease_name,
+        marker=marker,
+    )
+    return [Lease(l) for l in leases]
 
 
 def lease_get(request, lease_id):
@@ -121,6 +209,7 @@ def lease_update(request, lease_id, **kwargs):
 
 def lease_delete(request, lease_id):
     """Delete a lease."""
+    LOG.warning("User %s is deleting lease %s", request.user.username, lease_id)
     blazarclient(request).lease.delete(lease_id)
 
 
@@ -153,42 +242,192 @@ def host_delete(request, host_id):
     blazarclient(request).host.delete(host_id)
 
 
+def host_get_allocation(request, host_id):
+    """Get a host's allocations."""
+    allocation = blazarclient(request).host.get_allocation(host_id)
+    return Allocation(allocation)
+
+
 def host_allocations_list(request):
     """List allocations for all hosts."""
-    request_manager = blazarclient(request).host.request_manager
-    resp, body = request_manager.get('/os-hosts/allocations')
-    allocations = body['allocations']
+    allocations = blazarclient(request).host.list_allocations()
     return [Allocation(a) for a in allocations]
+
+
+def host_reallocate(request, host_id, lease_id):
+    # Convert hypervisor hostname to numeric ID
+    host = next(
+        (host for host in host_list(request) if host.hypervisor_hostname == host_id),
+        None)
+    # If no host was found, send along the hypervisor hostname
+    # to get an error message from blazar
+    id_to_use = host.id if host else host_id
+    return blazarclient(request).host.reallocate(id_to_use, {"lease_id": lease_id})
+
+
+def host_capabilities_list(request):
+    extra_capabilities = blazarclient(
+        request).host.list_properties(detail=True)
+    return [ExtraCapability(e) for e in extra_capabilities]
+
+
+def network_list(request):
+    """List networks."""
+    networks = blazarclient(request).network.list()
+    return [Network(n) for n in networks]
+
+
+def network_allocations_list(request):
+    """List allocations for all networks."""
+    allocations = blazarclient(request).network.list_allocations()
+    return [Allocation(a) for a in allocations]
+
+
+def network_capabilities_list(request):
+    extra_capabilities = blazarclient(
+        request).network.list_properties(detail=True)
+    extra_capabilities.append({'property': 'physical_network',
+                               'private': False,
+                               'property_values': ['physnet1', 'vlan']})
+    return [ExtraCapability(e) for e in extra_capabilities]
+
+
+def device_list(request):
+    """List devices."""
+    devices = blazarclient(request).device.list()
+    return [Device(d) for d in devices]
+
+
+def device_allocations_list(request):
+    """List allocations for all devices."""
+    allocations = blazarclient(request).device.list_allocations()
+    return [Allocation(a) for a in allocations]
+
+
+def device_capabilities_list(request):
+    extra_capabilities = blazarclient(
+        request).device.list_properties(detail=True)
+    return [ExtraCapability(e) for e in extra_capabilities]
+
+
+def compute_host_available(request, start_date, end_date):
+    """
+    Return the number of compute hosts available for reservation for the entire
+    specified date range.
+    """
+    def check_host_unavailable(reservation):
+        lease_start = _parse_api_datestr(reservation['start_date'])
+        lease_end = _parse_api_datestr(reservation['end_date'])
+
+        if (lease_start > start_date and lease_start < end_date):
+            return True
+        elif (lease_end > start_date and lease_end < end_date):
+            return True
+        elif (lease_start < start_date and lease_end > end_date):
+            return True
+        else:
+            return False
+
+    available_hosts = [
+        h for h in host_allocations_list(request)
+        if (not any([check_host_unavailable(r) for r in h.reservations]) or
+            not h.reservations)]
+
+    return len(available_hosts)
+
+
+def device_available(request, start_date, end_date):
+    """
+    Return the number of devices available for reservation for the entire
+    specified date range.
+    """
+    def check_device_unavailable(reservation):
+        lease_start = _parse_api_datestr(reservation['start_date'])
+        lease_end = _parse_api_datestr(reservation['end_date'])
+
+        if (lease_start > start_date and lease_start < end_date):
+            return True
+        elif (lease_end > start_date and lease_end < end_date):
+            return True
+        elif (lease_start < start_date and lease_end > end_date):
+            return True
+        else:
+            return False
+
+    available_devices = [
+        d for d in device_allocations_list(request)
+        if (not any([check_device_unavailable(r) for r in d.reservations]) or
+            not d.reservations)]
+
+    return len(available_devices)
+
+
+def compute_host_display_name(host):
+    return getattr(host, 'node_name', 'node{}'.format(host.id))
+
+
+def compute_host_display_type(host):
+    return getattr(host, 'node_type', 'unknown')
+
+
+def nodes_in_lease(request, lease):
+    """Return list of hypervisor_hostnames in a lease."""
+    if not any(
+            r['resource_type'] == 'physical:host' for r in lease['reservations']):
+        return []
+
+    hypervisor_by_host_id = {
+        h.id: {
+            'hypervisor_hostname': h.hypervisor_hostname,
+            'node_name': compute_host_display_name(h),
+            'reservable': h.reservable,
+        }
+        for h in host_list(request)}
+
+    return [
+        dict(
+            hypervisor_hostname=hypervisor_by_host_id[h.resource_id].get(
+                'hypervisor_hostname'),
+            node_name=hypervisor_by_host_id[h.resource_id].get('node_name'),
+            deleted=False,
+            reservable=hypervisor_by_host_id[h.resource_id].get('reservable'),
+        )
+        for h in host_allocations_list(request)
+        if any((r['lease_id'] == lease['id']) for r in h.reservations)]
 
 
 def reservation_calendar(request):
     """Return a list of all scheduled leases."""
 
     def compute_host2dict(h):
-        dictionary = dict(
+        host_dict = dict(
             hypervisor_hostname=h.hypervisor_hostname, vcpus=h.vcpus,
             memory_mb=h.memory_mb, local_gb=h.local_gb, cpu_info=h.cpu_info,
-            hypervisor_type=h.hypervisor_type,)
-        # Ensure config attribute is copied over
-        calendar_attribute = conf.host_reservation.get('calendar_attribute')
-        dictionary[calendar_attribute] = (
-            h[calendar_attribute]
-        )
-        return dictionary
+            hypervisor_type=h.hypervisor_type, node_type=compute_host_display_type(h),
+            node_name=compute_host_display_name(h), reservable=h.reservable)
+        # Copy these keys if they exist
+        for key in ["authorized_projects", "restricted_reason"]:
+            if key in h:
+                host_dict[key] = h[key]
+        return host_dict
 
-    # NOTE: This filters by reservable hosts
-    hosts_by_id = {h.id: h for h in host_list(request) if h.reservable}
+    hosts_by_id = {h.id: h for h in host_list(request)}
 
     def host_reservation_dict(reservation, resource_id):
         host_reservation = dict(
+            name=reservation.get('name'),
+            project_id=reservation.get('project_id'),
             start_date=_parse_api_datestr(reservation['start_date']),
             end_date=_parse_api_datestr(reservation['end_date']),
-            reservation_id=reservation['id'],
-        )
-        calendar_attribute = conf.host_reservation.get('calendar_attribute')
-        host_reservation[calendar_attribute] = (
-            hosts_by_id[resource_id][calendar_attribute]
-        )
+            id=reservation['id'],
+            status=reservation.get('status'),
+            hypervisor_hostname=hosts_by_id[resource_id].hypervisor_hostname,
+            usage=reservation.get("usage"),
+            node_name=compute_host_display_name(hosts_by_id[resource_id]))
+        # Only include "extras" for reservations in the current project
+        if request.user.project_id == reservation.get('project_id'):
+            host_reservation["extras"] = [(PRETTY_EXTRA_LABELS.get(key, key), value)
+                    for key, value in reservation.get("extras").items()]
 
         return {k: v for k, v in host_reservation.items() if v is not None}
 
@@ -201,6 +440,165 @@ def reservation_calendar(request):
     compute_hosts = [compute_host2dict(h) for h in hosts_by_id.values()]
 
     return compute_hosts, list(chain(*host_reservations))
+
+
+def flavor_reservation_calendar(request):
+    hosts, reservations = reservation_calendar(request)
+
+    async def fetch_async_data():
+        async def fetch_resource_providers():
+            try:
+                return placement.resource_providers(request)
+            except Exception as e:
+                # If there is an issue with placment API, ignore it
+                return []
+
+        async def fetch_flavors():
+            # Filter flavors to exclude reserved flavors
+            return [
+                f for f in flavors(request)
+                if not any(
+                    k.startswith("resources:CUSTOM_RESERVATION_")
+                    for k in f["extra_specs"].keys()
+                )
+            ]
+
+        async def fetch_traits(rp):
+            try:
+                rp["traits"] = placement.resource_provider_traits(
+                    request, rp["uuid"])
+            except Exception as e:
+                # If there is an issue with placment API, ignore it
+                return []
+
+        flavors_task = fetch_flavors()
+        rps = await fetch_resource_providers()
+        host_tasks = [fetch_traits(rp) for rp in rps]
+        *_, flavor_result = await asyncio.gather(*host_tasks, flavors_task)
+        return rps, flavor_result
+
+    # Fetch flavors and host traits. Hosts list is updated in place
+    resource_providers, f = asyncio.run(fetch_async_data())
+    rp_by_name = {
+        rp["name"]: rp for rp in resource_providers
+    }
+    for host in hosts:
+        host["traits"] = rp_by_name.get(
+            host["hypervisor_hostname"], {}).get("traits")
+    return {
+        "hosts": hosts,
+        "flavors": f,
+    }, reservations
+
+def network_reservation_calendar(request):
+    """Return a list of all scheduled network leases."""
+
+    def network2dict(n):
+        return dict(
+            network_type=n.network_type, physical_network=n.physical_network,
+            segment_id=n.segment_id)
+
+    networks_by_id = {n.id: n for n in network_list(request)}
+
+    def network_reservation_dict(reservation, resource_id):
+        network_reservation = dict(
+            name=reservation.get('name'),
+            project_id=reservation.get('project_id'),
+            start_date=_parse_api_datestr(reservation['start_date']),
+            end_date=_parse_api_datestr(reservation['end_date']),
+            id=reservation['id'],
+            status=reservation.get('status'),
+            segment_id=networks_by_id[resource_id].segment_id)
+
+        return {k: v for k, v in network_reservation.items() if v is not None}
+
+    network_reservations = [
+        [network_reservation_dict(r, alloc.resource_id)
+            for r in alloc.reservations
+            if alloc.resource_id in networks_by_id]
+        for alloc in network_allocations_list(request)]
+
+    networks = [network2dict(n) for n in networks_by_id.values()]
+
+    return networks, list(chain(*network_reservations))
+
+
+def device_reservation_calendar(request):
+    """Return a list of all scheduled device leases."""
+
+    def device2dict(d):
+        device_dict = dict(
+            device_name=d.name, device_type=d.device_type,
+            device_driver=d.device_driver, vendor=d.vendor,
+            reservable=d.reservable)
+        # Copy these keys if they exist
+        for key in ["authorized_projects", "restricted_reason"]:
+            if key in d:
+                device_dict[key] = d[key]
+        return device_dict
+
+    devices_by_id = {d.id: d for d in device_list(request)}
+
+    def device_reservation_dict(reservation, resource_id):
+        device_reservation = dict(
+            name=reservation.get('name'),
+            project_id=reservation.get('project_id'),
+            start_date=_parse_api_datestr(reservation['start_date']),
+            end_date=_parse_api_datestr(reservation['end_date']),
+            id=reservation['id'],
+            status=reservation.get('status'),
+            device_name=devices_by_id[resource_id].name,
+            extras=[(PRETTY_EXTRA_LABELS[key], value)
+                    for key, value in reservation.get("extras").items()]
+        )
+
+        return {k: v for k, v in device_reservation.items() if v is not None}
+
+    device_reservations = [
+        [device_reservation_dict(r, alloc.resource_id)
+            for r in alloc.reservations
+            if alloc.resource_id in devices_by_id]
+        for alloc in device_allocations_list(request)]
+
+    devices = [device2dict(d) for d in devices_by_id.values()]
+
+    return devices, list(chain(*device_reservations))
+
+
+def computehost_extra_capabilities(request):
+    return {
+        x.property: x.property_values for x
+        in host_capabilities_list(request)}
+
+
+def network_extra_capabilities(request):
+    return {
+        x.property: x.property_values for x
+        in network_capabilities_list(request)}
+
+
+def device_extra_capabilities(request):
+    return {
+        x.property: x.property_values for x
+        in device_capabilities_list(request)}
+
+
+def flavors(request):
+    # NOTE we need >=v2.61 (Queens) for flavor description, which will be useful for users.
+    flavors = _nova.novaclient(request, version="2.61").flavors.list()
+    return [
+        f.to_dict() for f in flavors if f.name != conf.baremetal_flavor_name
+    ]
+
+
+def get_floatingip_network_id(request, network_name_regex):
+    """Return default network id for floatingip reservation"""
+    pattern = re.compile(network_name_regex)
+    networks = [
+        n['id'] for n in neutron.network_list(request)
+        if re.match(pattern, str(n['name']))]
+
+    return networks[0]
 
 
 def _parse_api_datestr(datestr):

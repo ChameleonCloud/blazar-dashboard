@@ -12,37 +12,99 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
-from django.http import JsonResponse
-from django.urls import reverse
-from django.urls import reverse_lazy
-from django.utils.translation import gettext_lazy as _
-from horizon import exceptions
-from horizon import forms
-from horizon import tables
-from horizon import tabs
-from horizon.utils import memoized
-from horizon import views
+import datetime
+import logging
+import zoneinfo
+from concurrent.futures import ThreadPoolExecutor
 
 from blazar_dashboard import api
 from blazar_dashboard import conf
-from blazar_dashboard.content.leases import forms as project_forms
+from blazar_dashboard.api import client
 from blazar_dashboard.content.leases import tables as project_tables
 from blazar_dashboard.content.leases import tabs as project_tabs
+from blazar_dashboard.content.leases import workflows as project_workflows
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
+from django.views.generic import RedirectView
+from horizon import exceptions
+from horizon import messages
+from horizon import tables
+from horizon import tabs
+from horizon import views
+from horizon import workflows
+from horizon.utils import memoized
+
+LOG = logging.getLogger(__name__)
+
+COMPUTE_RESERVATION_TYPES = frozenset(["physical:host", "flavor:instance"])
+
+def compute_reservation_types(lease):
+    return COMPUTE_RESERVATION_TYPES & {
+        reservation["resource_type"] for reservation in lease["reservations"]}
 
 
-class IndexView(tables.DataTableView):
+class IndexView(tables.PagedTableMixin, tables.DataTableView):
     table_class = project_tables.LeasesTable
     template_name = 'project/leases/index.html'
 
+    def get_data_kwargs(self):
+        # User applied filters
+        filters = self.get_filters()
+        return {
+            'all_tenants': False,
+            "marker": self.request.GET.get(
+                self.table_class._meta.pagination_param, None),
+            "limit": conf.api_limit,
+            **filters,
+       }
+
+    # Compute reservation type this panel lists.
+    lists = "physical:host"
+
+    def filter_leases(self, leases):
+        """Keep leases for this panel's compute type.
+
+        A lease reserving no compute (e.g. network only) is listed in both panels.
+        """
+        return [lease for lease in leases
+                if not compute_reservation_types(lease)
+                or self.lists in compute_reservation_types(lease)]
+
     def get_data(self):
         try:
-            leases = api.client.lease_list(self.request)
+            leases = api.client.lease_list(
+                self.request,
+                **self.get_data_kwargs(),
+            )
+            limit = self.get_data_kwargs()['limit']
+            self._has_more_data = len(leases) == limit
+            # TODO(Mike): Breaks pagination, filter runs after the page fetch.
+            leases = self.filter_leases(leases)
         except Exception:
             leases = []
+            self._has_more_data = False
             msg = _('Unable to retrieve lease information.')
             exceptions.handle(self.request, msg)
         return leases
+
+
+class VirtualLeasesIndexView(IndexView):
+    table_class = project_tables.VirtualLeasesTable
+    lists = "flavor:instance"
+
+
+def add_timezone_context(request, context):
+    """Supply the offset the calendar charts shift their timestamps by."""
+    tz = zoneinfo.ZoneInfo(
+        request.session.get('django_timezone',
+                            request.COOKIES.get('django_timezone', 'UTC')))
+    context['timezone'] = tz
+    context['offset'] = int(
+        (datetime.datetime.now(tz).utcoffset().total_seconds() / 60) * -1)
+    context['settings_href'] = reverse('horizon:settings:user:index')
+    return context
 
 
 class CalendarView(views.APIView):
@@ -50,68 +112,162 @@ class CalendarView(views.APIView):
 
     titles = {
         "host": _("Host Calendar"),
+        "network": _("Network Calendar"),
+        "device": _("Device Calendar"),
+        "flavor": _("Flavor Calendar"),
     }
 
     def get_data(self, request, context, *args, **kwargs):
         if context["resource_type"] not in self.titles:
             raise exceptions.NotFound
+        add_timezone_context(self.request, context)
         context["calendar_title"] = self.titles[context["resource_type"]]
+        return context
+
+
+class FlavorCalendarView(views.APIView):
+    template_name = "project/leases/calendar_flavor.html"
+
+    def get_data(self, request, context, *args, **kwargs):
+        add_timezone_context(self.request, context)
+        context["calendar_title"] = _("Flavor Calendar")
         return context
 
 
 def calendar_data_view(request, resource_type):
     api_mapping = {
         "host": api.client.reservation_calendar,
-    }
-    attribute_mapping = {
-        "host": conf.host_reservation.get('calendar_attribute'),
+        "network": api.client.network_reservation_calendar,
+        "device": api.client.device_reservation_calendar,
+        "flavor": api.client.flavor_reservation_calendar,
     }
     data = {}
-    if resource_type not in api_mapping:
-        raise exceptions.NotFound
     resources, reservations = api_mapping[resource_type](request)
     data['resources'] = resources
     data['reservations'] = reservations
-    # Which attribute to use to determine calendar rows
-    data['row_attr'] = attribute_mapping[resource_type]
+    data["project_id"] = request.user.project_id
     return JsonResponse(data)
+
+
+def extra_capabilities(request, resource_type):
+    extra_capabilities_function_map = {
+        "computehost": api.client.computehost_extra_capabilities,
+        "network": api.client.network_extra_capabilities,
+        "device": api.client.device_extra_capabilities
+    }
+    # Properties from the object to also fetch
+    object_properties_map = {
+        "device": ["name"],
+        "network": ["segment_id"],
+    }
+    object_list_function_map = {
+        "device": api.client.device_list,
+        "network": api.client.network_list,
+    }
+
+    extra_caps = None
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        extra_capabilities_future = None
+        if resource_type in extra_capabilities_function_map:
+            extra_capabilities_future = executor.submit(extra_capabilities_function_map[resource_type], request)
+
+        objects = None
+        if resource_type in object_list_function_map:
+            objects_future = executor.submit(object_list_function_map[resource_type], request)
+            objects = objects_future.result()
+
+        if extra_capabilities_future:
+            extra_caps = extra_capabilities_future.result()
+            if objects:
+                for prop in object_properties_map[resource_type]:
+                    values = set()
+                    for obj in objects:
+                        values.add(obj.get(prop))
+                    extra_caps[prop] = list(values)
+    data = {
+        'extra_capabilities': extra_caps}
+    return JsonResponse(data)
+
+
+def flavors(request):
+    return JsonResponse({'flavors': api.client.flavors(request)})
 
 
 class DetailView(tabs.TabView):
     tab_group_class = project_tabs.LeaseDetailTabs
     template_name = 'project/leases/detail.html'
+    # Compute reservation type this detail view is for
+    lists = "physical:host"
+    redirect_url = 'horizon:project:leases:index'
+
+    @memoized.memoized_method
+    def get_data(self):
+        lease_id = self.kwargs['lease_id']
+        try:
+            lease = api.client.lease_get(self.request, lease_id)
+        except Exception:
+            redirect = reverse(self.redirect_url)
+            exceptions.handle(self.request,
+                              _('Unable to retrieve details for '
+                                'lease "%s".') % lease_id,
+                              redirect=redirect)
+            # Not all exception types handled above will result in a redirect.
+            # Need to raise here just in case.
+            raise exceptions.Http302(redirect)
+
+        return lease
+
+    def get_tabs(self, request, *args, **kwargs):
+        lease = self.get_data()
+        return self.tab_group_class(request, lease=lease, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        HOST_DETAIL = "horizon:project:leases:detail"
+        FLAVOR_DETAIL = "horizon:project:virtual_leases:detail"
+        # Bookmarks, docs and admin panels link to one panel whatever the
+        # lease reserves. Redirect to the panel that lists it.
+        lease_id = self.kwargs['lease_id']
+        types = compute_reservation_types(self.get_data())
+        if types and self.lists not in types:
+            # Mismatched, so send it to the other panel.
+            target = (FLAVOR_DETAIL if self.lists == "physical:host"
+                      else HOST_DETAIL)
+            return redirect(reverse(target, args=[lease_id]))
+
+        # Base case
+        return super().get(request, *args, **kwargs)
 
 
-class CreateView(forms.ModalFormView):
-    form_class = project_forms.CreateForm
-    template_name = 'project/leases/create.html'
-    success_url = reverse_lazy('horizon:project:leases:index')
-    modal_id = "create_lease_modal"
-    modal_header = _("Create Lease")
-    submit_label = _("Create Lease")
-    submit_url = reverse_lazy('horizon:project:leases:create')
+class VirtualDetailView(DetailView):
+    lists = "flavor:instance"
 
 
-class UpdateView(forms.ModalFormView):
-    form_class = project_forms.UpdateForm
-    template_name = 'project/leases/update.html'
-    success_url = reverse_lazy('horizon:project:leases:index')
-    modal_header = _("Update Lease")
+class CreateView(workflows.WorkflowView):
+    workflow_class = project_workflows.CreateLease
+
+    def get_initial(self):
+        initial = super(CreateView, self).get_initial()
+        node_name = self.request.GET.get('node_name')
+        if node_name:
+            initial['with_computehost'] = True
+            initial['min_hosts'] = 1
+            initial['max_hosts'] = 1
+            initial['computehost_resource_properties'] = f'node_name == {node_name}'
+        return initial
+
+
+class VirtualCreateView(CreateView):
+    workflow_class = project_workflows.VirtualCreateLease
+
+
+class UpdateView(workflows.WorkflowView):
+    workflow_class = project_workflows.UpdateLease
 
     def get_initial(self):
         initial = super(UpdateView, self).get_initial()
-
         initial['lease'] = self.get_object()
-        if initial['lease']:
-            initial['lease_id'] = initial['lease'].id
-            initial['name'] = initial['lease'].name
 
         return initial
-
-    def get_context_data(self, **kwargs):
-        context = super(UpdateView, self).get_context_data(**kwargs)
-        context['lease'] = self.get_object()
-        return context
 
     @memoized.memoized_method
     def get_object(self):
@@ -123,3 +279,37 @@ class UpdateView(forms.ModalFormView):
             redirect = reverse('horizon:project:leases:index')
             exceptions.handle(self.request, msg, redirect=redirect)
         return lease
+
+class ReallocateView(RedirectView):
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handles requests made by buttons
+        """
+        host_reallocate = request.POST.get("host_reallocate")
+        fail_page = reverse("horizon:project:leases:index")
+        if not host_reallocate:
+            LOG.error(f"Received malformed POST: {request.POST}")
+            return redirect(fail_page)
+        try:
+            host_id, lease_id = host_reallocate.split(maxsplit=1)
+            next_url = reverse("horizon:project:leases:detail", args=[lease_id])
+        except Exception:
+            exceptions.handle(
+                request, _("Missing node ID or Lease ID"), redirect=fail_page
+            )
+            return redirect(fail_page)
+
+        try:
+            client.host_reallocate(request, host_id, lease_id)
+        except Exception:
+            exceptions.handle(
+                request, _("Could not reallocate host."), redirect=next_url
+            )
+            return redirect(next_url)
+
+        messages.success(request, f"Reallocated host {host_id}. "
+                                  f"Updates may not appear in lease "
+                                  f"for a few more seconds.")
+
+        return redirect(next_url)

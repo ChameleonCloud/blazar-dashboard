@@ -15,9 +15,33 @@ from django.conf import settings
 host_reservation = (
     getattr(settings, 'OPENSTACK_BLAZAR_HOST_RESERVATION', {
         'enabled': True,
+        'url_format': None,
         'calendar_attribute': 'hypervisor_hostname',
     }))
 
 floatingip_reservation = (
     getattr(settings, 'OPENSTACK_BLAZAR_FLOATINGIP_RESERVATION', {
         'enabled': False, }))
+
+network_reservation = (
+    getattr(settings, 'OPENSTACK_BLAZAR_NETWORK_RESERVATION', {
+        'enabled': True,
+    }))
+
+device_reservation = (
+    getattr(settings, 'OPENSTACK_BLAZAR_DEVICE_RESERVATION', {
+        'enabled': False,
+    }))
+
+flavor_reservation = (
+    getattr(settings, 'OPENSTACK_BLAZAR_FLAVOR_RESERVATION', {
+        'enabled': False,
+    }))
+
+baremetal_flavor_name = getattr(
+    settings, 'CHAMELEON_BAREMETAL_FLAVOR_NAME', 'baremetal')
+
+api_limit = getattr(settings, 'OPENSTACK_BLAZAR_API_LIMIT', 20)
+
+default_compute_node_type = getattr(
+    settings, 'OPENSTACK_BLAZAR_DEFAULT_COMPUTE_NODE_TYPE', 'compute_skylake')

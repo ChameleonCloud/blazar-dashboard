@@ -16,6 +16,17 @@
   box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
+.tooltip-content, #resource-disabled-tooltip {
+  box-sizing: border-box;
+  background-color: #eee;
+  border-color: #ccc;
+  padding: 3px;
+}
+
+#resource-disabled-tooltip {
+  max-width: 300px;
+}
+
 .apexcharts-series {
   opacity: 0.9;
 }
@@ -53,3 +64,7 @@
   width: 55px;
 }
 
+#resource-disabled-tooltip {
+    display: none;
+    position: absolute;
+}
